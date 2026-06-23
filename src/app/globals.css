@@ -60,7 +60,7 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: #5b5b5b; /* darkened from oklch(0.556) for WCAG AA over frosted glass */
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -126,5 +126,52 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* ============================================================================
+   Glassmorphism layer (visual only) — warm mesh background + a11y fallbacks.
+   ============================================================================ */
+
+/* Warm, low-contrast amber/cream mesh the frosted panels read against.
+   Un-layered so it overrides the @layer base `bg-background` on <body>. */
+body {
+  background-color: #fdf7ee;
+  background-image:
+    radial-gradient(at 12% 18%, rgba(251, 191, 36, 0.20) 0px, transparent 55%),
+    radial-gradient(at 88% 12%, rgba(254, 226, 197, 0.45) 0px, transparent 50%),
+    radial-gradient(at 78% 82%, rgba(251, 207, 170, 0.34) 0px, transparent 55%),
+    radial-gradient(at 18% 88%, rgba(255, 237, 213, 0.50) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(255, 248, 237, 0.30) 0px, transparent 70%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-color: #0b0a09;
+  background-image:
+    radial-gradient(at 12% 18%, rgba(180, 83, 9, 0.20) 0px, transparent 55%),
+    radial-gradient(at 88% 12%, rgba(120, 53, 15, 0.28) 0px, transparent 50%),
+    radial-gradient(at 78% 82%, rgba(146, 64, 14, 0.22) 0px, transparent 55%);
+}
+
+/* Accessibility: if the user asks for less transparency, every `.glass` panel
+   becomes a solid, un-blurred card. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass {
+    background-color: var(--card) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+/* Accessibility: honor reduced motion (e.g. the demo-banner pulse). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -1,14 +1,16 @@
 import { CalendarClock } from "lucide-react";
-import { Card } from "@/components/ui/card";
 import { AlertBadge } from "@/components/alert-badge";
 import { cn } from "@/lib/utils";
+import { glassPanel } from "@/lib/glass";
 import type { InventoryRow } from "@/lib/data/types";
 import { CATEGORY_LABELS, daysUntil } from "@/lib/dashboard";
 import { formatNumber } from "@/lib/format";
 
 export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
+  // One frosted-glass panel for the whole section; the inner SKU cards are
+  // translucent-but-NOT-blurred (we blur the container, not every child).
   return (
-    <section className="space-y-3">
+    <section className={cn(glassPanel, "space-y-3 p-5")}>
       <div className="flex items-center gap-2">
         <CalendarClock className="size-4 text-muted-foreground" />
         <h2 className="text-base font-semibold">Reorder Queue</h2>
@@ -18,20 +20,22 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
       </div>
 
       {rows.length === 0 ? (
-        <Card className="p-6 text-sm text-muted-foreground">
+        <div className="rounded-xl border border-white/50 bg-white/40 p-6 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/5">
           Nothing to reorder in the next 14 days.
-        </Card>
+        </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map((r) => {
             const d = daysUntil(r.reorderDate) ?? 0;
             const overdue = d < 0;
             return (
-              <Card
+              <div
                 key={r.productId}
                 className={cn(
-                  "gap-0 p-4",
-                  overdue ? "ring-red-500/40" : "ring-amber-500/30",
+                  "rounded-xl border bg-white/45 p-4 shadow-sm dark:bg-white/[0.05]",
+                  overdue
+                    ? "border-red-300/70 dark:border-red-500/30"
+                    : "border-amber-300/60 dark:border-amber-500/25",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
@@ -49,7 +53,7 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
                   <span
                     className={cn(
                       "font-semibold",
-                      overdue ? "text-red-600" : "text-amber-700",
+                      overdue ? "text-red-700" : "text-amber-800",
                     )}
                   >
                     {overdue
@@ -62,7 +66,7 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
                     {formatNumber(r.currentUnits)} u · {formatNumber(r.daysOfStockRemaining)}d DSR
                   </span>
                 </div>
-              </Card>
+              </div>
             );
           })}
         </div>

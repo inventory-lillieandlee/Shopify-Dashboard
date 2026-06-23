@@ -2,17 +2,20 @@ import { cn } from "@/lib/utils";
 import type { AlertLevel } from "@/lib/data/types";
 import { ALERT_LABELS } from "@/lib/dashboard";
 
+// SOLID, opaque, theme-independent status chips — legibility beats aesthetic, so
+// these never go translucent and never sit over the frosted glass directly.
+// Each pair is WCAG-AA verified (see report): ratios 6.4–7.3:1.
 const STYLES: Record<AlertLevel, string> = {
-  ok: "bg-emerald-50 text-emerald-700 ring-emerald-600/20",
-  yellow: "bg-amber-100 text-amber-900 ring-amber-600/30",
-  red: "bg-red-100 text-red-800 ring-red-600/30",
-  critical: "bg-red-600 text-white ring-red-700/40",
+  ok: "bg-[#d1fae5] text-[#065f46] ring-black/5", // 6.78:1
+  yellow: "bg-[#fde68a] text-[#78350f] ring-black/5", // 7.29:1
+  red: "bg-[#fecaca] text-[#7f1d1d] ring-black/5", // 6.92:1
+  critical: "bg-[#b91c1c] text-white ring-black/10", // 6.47:1
 };
 
 const DOT: Record<AlertLevel, string> = {
-  ok: "bg-emerald-500",
-  yellow: "bg-amber-500",
-  red: "bg-red-500",
+  ok: "bg-[#059669]",
+  yellow: "bg-[#b45309]",
+  red: "bg-[#dc2626]",
   critical: "bg-white",
 };
 

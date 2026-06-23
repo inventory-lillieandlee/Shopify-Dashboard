@@ -47,11 +47,13 @@ function SpikeCell({ pct }: { pct: number | null }) {
     return <span className="text-muted-foreground">—</span>;
   }
   const critical = pct >= SPIKE_ALERT_THRESHOLD;
+  // SOLID opaque chip — never translucent over the glass. AA-verified:
+  // ≥15% red 5.30:1, 10–14% amber 6.37:1.
   return (
     <span
       className={cn(
-        "font-medium tabular-nums",
-        critical ? "text-red-600" : "text-amber-600",
+        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
+        critical ? "bg-[#fee2e2] text-[#b91c1c]" : "bg-[#fef3c7] text-[#92400e]",
       )}
     >
       ▲ {formatNumber(pct, 0)}%

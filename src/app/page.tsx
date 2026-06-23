@@ -7,6 +7,8 @@ import {
   type SortKey,
 } from "@/lib/dashboard";
 import { CATEGORIES, type AlertLevel, type Category } from "@/lib/data/types";
+import { cn } from "@/lib/utils";
+import { glassPanel } from "@/lib/glass";
 import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SummaryCards } from "@/components/summary-cards";
@@ -59,12 +61,13 @@ export default async function Page({
   return (
     <div className="min-h-screen">
       <DemoBanner />
-      <SiteHeader />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <SiteHeader />
+
         <SummaryCards summary={summary} />
 
         <section className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3 px-1">
             <div>
               <h2 className="text-base font-semibold">Inventory</h2>
               <p className="text-sm text-muted-foreground">
@@ -79,7 +82,7 @@ export default async function Page({
               dir={dir}
             />
           </div>
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <div className={cn(glassPanel, "overflow-hidden")}>
             <InventoryTable rows={rows} sort={sort} dir={dir} />
           </div>
         </section>
