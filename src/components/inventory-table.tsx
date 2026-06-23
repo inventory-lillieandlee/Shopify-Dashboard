@@ -47,7 +47,7 @@ function SpikeCell({ pct }: { pct: number | null }) {
     return <span className="text-muted-foreground">—</span>;
   }
   const critical = pct >= SPIKE_ALERT_THRESHOLD;
-  // SOLID opaque chip — never translucent over the glass. AA-verified:
+  // SOLID opaque chip — never translucent over the surfaces. AA-verified:
   // ≥15% red 5.30:1, 10–14% amber 6.37:1.
   return (
     <span
@@ -73,7 +73,7 @@ export function InventoryTable({
   return (
     <Table>
       <TableHeader>
-        <TableRow className="hover:bg-transparent">
+        <TableRow className="hover:bg-transparent [&>th]:h-9 [&>th]:text-xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
           <TableHead>Product{sortMark(sort === "name", dir)}</TableHead>
           <TableHead>Category</TableHead>
           <TableHead className="text-right">

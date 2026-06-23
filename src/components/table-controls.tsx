@@ -94,7 +94,7 @@ export function TableControls({
       <button
         type="button"
         onClick={() => update({ dir: dir === "asc" ? "desc" : "asc" })}
-        className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm shadow-xs hover:bg-muted"
+        className="inline-flex h-9 items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm shadow-xs transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
         title={dir === "asc" ? "Ascending" : "Descending"}
       >
         {dir === "asc" ? (
@@ -109,7 +109,7 @@ export function TableControls({
         <button
           type="button"
           onClick={() => update({ category: null, alert: null })}
-          className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:text-foreground"
+          className="inline-flex h-9 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
         >
           <X className="size-3.5" /> Clear
         </button>

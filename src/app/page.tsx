@@ -8,7 +8,7 @@ import {
 } from "@/lib/dashboard";
 import { CATEGORIES, type AlertLevel, type Category } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
-import { glassPanel } from "@/lib/glass";
+import { surfacePanel } from "@/lib/surface";
 import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SummaryCards } from "@/components/summary-cards";
@@ -69,7 +69,9 @@ export default async function Page({
         <section className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3 px-1">
             <div>
-              <h2 className="text-base font-semibold">Inventory</h2>
+              <h2 className="font-display text-lg font-semibold text-brand">
+                Inventory
+              </h2>
               <p className="text-sm text-muted-foreground">
                 {rows.length} of {all.length} SKUs
                 {category || alert ? " (filtered)" : ""}
@@ -82,7 +84,12 @@ export default async function Page({
               dir={dir}
             />
           </div>
-          <div className={cn(glassPanel, "overflow-hidden")}>
+          <div
+            className={cn(
+              surfacePanel,
+              "animate-in overflow-hidden duration-500 fade-in slide-in-from-bottom-2",
+            )}
+          >
             <InventoryTable rows={rows} sort={sort} dir={dir} />
           </div>
         </section>

@@ -3,7 +3,7 @@ import type { AlertLevel } from "@/lib/data/types";
 import { ALERT_LABELS } from "@/lib/dashboard";
 
 // SOLID, opaque, theme-independent status chips — legibility beats aesthetic, so
-// these never go translucent and never sit over the frosted glass directly.
+// these stay opaque on the warm surfaces and never go translucent.
 // Each pair is WCAG-AA verified (see report): ratios 6.4–7.3:1.
 const STYLES: Record<AlertLevel, string> = {
   ok: "bg-[#d1fae5] text-[#065f46] ring-black/5", // 6.78:1

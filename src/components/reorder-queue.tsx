@@ -1,26 +1,31 @@
 import { CalendarClock } from "lucide-react";
 import { AlertBadge } from "@/components/alert-badge";
 import { cn } from "@/lib/utils";
-import { glassPanel } from "@/lib/glass";
+import { surfacePanel } from "@/lib/surface";
 import type { InventoryRow } from "@/lib/data/types";
 import { CATEGORY_LABELS, daysUntil } from "@/lib/dashboard";
 import { formatNumber } from "@/lib/format";
 
 export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
-  // One frosted-glass panel for the whole section; the inner SKU cards are
-  // translucent-but-NOT-blurred (we blur the container, not every child).
   return (
-    <section className={cn(glassPanel, "space-y-3 p-5")}>
+    <section
+      className={cn(
+        surfacePanel,
+        "animate-in space-y-4 p-5 duration-500 fade-in slide-in-from-bottom-2",
+      )}
+    >
       <div className="flex items-center gap-2">
-        <CalendarClock className="size-4 text-muted-foreground" />
-        <h2 className="text-base font-semibold">Reorder Queue</h2>
+        <CalendarClock className="size-4 text-brand-sage" />
+        <h2 className="font-display text-lg font-semibold text-brand">
+          Reorder Queue
+        </h2>
         <span className="text-sm text-muted-foreground">
           overdue or due within 14 days · {rows.length}
         </span>
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-xl border border-white/50 bg-white/40 p-6 text-sm text-muted-foreground dark:border-white/10 dark:bg-white/5">
+        <div className="rounded-xl border border-border bg-muted p-6 text-sm text-muted-foreground">
           Nothing to reorder in the next 14 days.
         </div>
       ) : (
@@ -32,10 +37,8 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
               <div
                 key={r.productId}
                 className={cn(
-                  "rounded-xl border bg-white/45 p-4 shadow-sm dark:bg-white/[0.05]",
-                  overdue
-                    ? "border-red-300/70 dark:border-red-500/30"
-                    : "border-amber-300/60 dark:border-amber-500/25",
+                  "rounded-xl border border-l-4 border-border bg-muted p-4 transition-shadow hover:shadow-sm",
+                  overdue ? "border-l-red-600" : "border-l-amber-500",
                 )}
               >
                 <div className="flex items-start justify-between gap-2">
