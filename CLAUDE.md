@@ -126,6 +126,7 @@ Do **not** build ReCharge, projections, spike detection, or alerts in Phase 1.
 ## Gotchas / conventions
 
 - **Inventory is per-variant + per-location.** Webhooks key on `inventory_item_id`, not product id — store it on `products` and map back from it. Confirm which Shopify location(s) count as on-hand before backfill.
+- **Never hard-delete a product row — deactivate with `active=false`.** Hard deletes cascade and wipe `alert_log` history, which Phase 4 requires retained.
 - **Always verify the Shopify webhook HMAC** before processing.
 - **Idempotency**: Shopify retries webhooks — dedupe on `X-Shopify-Webhook-Id` so you don't double-write snapshots.
 - **Shopify rate limit**: REST is 2 req/s (40 burst, leaky bucket). Exponential backoff on 429.
