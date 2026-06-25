@@ -130,10 +130,13 @@ export function InventoryTable({
               <TableCell>
                 <ReorderCell iso={r.reorderDate} />
               </TableCell>
-              <TableCell>
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+              <TableCell className="whitespace-nowrap">
+                <div className="flex items-center gap-1.5">
                   <AlertBadge level={r.alertLevel} />
-                  <AlertReasonText reason={primaryAlertReason(r)} />
+                  <AlertReasonText
+                    reason={primaryAlertReason(r)}
+                    className="whitespace-nowrap"
+                  />
                 </div>
               </TableCell>
               <TableCell>

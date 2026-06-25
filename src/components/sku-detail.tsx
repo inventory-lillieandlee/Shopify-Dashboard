@@ -51,7 +51,7 @@ export function SkuDetail({ row }: { row: InventoryRow }) {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Stat label="Current units" value={formatNumber(row.currentUnits)} hint="Shopify on-hand" />
-        <Stat label="Total units" value={formatNumber(row.totalUnits)} hint="Shopify + 3PL" />
+        <Stat label="Total units" value={formatNumber(row.totalUnits)} hint="3PL not yet connected" />
         <Stat
           label="Daily demand (DDR)"
           value={row.dailyDemandRate === null ? "—" : `${formatNumber(row.dailyDemandRate, 1)}/day`}
