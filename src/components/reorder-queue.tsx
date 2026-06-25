@@ -1,9 +1,10 @@
 import { CalendarClock } from "lucide-react";
 import { AlertBadge } from "@/components/alert-badge";
+import { AlertReasonText } from "@/components/alert-reason";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
 import type { InventoryRow } from "@/lib/data/types";
-import { CATEGORY_LABELS, daysUntil } from "@/lib/dashboard";
+import { CATEGORY_LABELS, daysUntil, primaryAlertReason } from "@/lib/dashboard";
 import { formatNumber } from "@/lib/format";
 
 export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
@@ -33,6 +34,7 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
           {rows.map((r) => {
             const d = daysUntil(r.reorderDate) ?? 0;
             const overdue = d < 0;
+            const reason = primaryAlertReason(r);
             return (
               <div
                 key={r.productId}
@@ -46,8 +48,9 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
                     <div className="truncate font-medium" title={r.name}>
                       {r.name}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       {CATEGORY_LABELS[r.category]}
+                      <AlertReasonText reason={reason} />
                     </div>
                   </div>
                   <AlertBadge level={r.alertLevel} />

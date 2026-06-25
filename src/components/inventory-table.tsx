@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -7,11 +8,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AlertBadge } from "@/components/alert-badge";
+import { AlertReasonText } from "@/components/alert-reason";
 import { cn } from "@/lib/utils";
 import type { InventoryRow } from "@/lib/data/types";
 import {
   CATEGORY_LABELS,
   daysUntil,
+  primaryAlertReason,
   SPIKE_ALERT_THRESHOLD,
   SPIKE_DISPLAY_THRESHOLD,
   type SortDir,
@@ -49,8 +52,12 @@ function SpikeCell({ pct }: { pct: number | null }) {
   const critical = pct >= SPIKE_ALERT_THRESHOLD;
   // SOLID opaque chip — never translucent over the surfaces. AA-verified:
   // ≥15% red 5.30:1, 10–14% amber 6.37:1.
+  const title = critical
+    ? `${formatNumber(pct, 0)}% above projected 7-day demand — spike alert (≥${SPIKE_ALERT_THRESHOLD}%)`
+    : `${formatNumber(pct, 0)}% above projected 7-day demand — watch (below ${SPIKE_ALERT_THRESHOLD}% alert)`;
   return (
     <span
+      title={title}
       className={cn(
         "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums",
         critical ? "bg-[#fee2e2] text-[#b91c1c]" : "bg-[#fef3c7] text-[#92400e]",
@@ -101,7 +108,14 @@ export function InventoryTable({
               key={r.productId}
               className={cn(r.alertLevel === "critical" && "bg-red-50/60")}
             >
-              <TableCell className="font-medium">{r.name}</TableCell>
+              <TableCell className="font-medium">
+                <Link
+                  href={`/sku/${r.shopifyProductId}`}
+                  className="rounded-sm underline-offset-2 hover:text-brand hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+                >
+                  {r.name}
+                </Link>
+              </TableCell>
               <TableCell className="text-muted-foreground">
                 {CATEGORY_LABELS[r.category]}
               </TableCell>
@@ -117,7 +131,10 @@ export function InventoryTable({
                 <ReorderCell iso={r.reorderDate} />
               </TableCell>
               <TableCell>
-                <AlertBadge level={r.alertLevel} />
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                  <AlertBadge level={r.alertLevel} />
+                  <AlertReasonText reason={primaryAlertReason(r)} />
+                </div>
               </TableCell>
               <TableCell>
                 <SpikeCell pct={r.spikePct} />

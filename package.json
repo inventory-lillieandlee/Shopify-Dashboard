@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/lib/projections/engine.test.ts",
+    "test": "node --test src/lib/projections/engine.test.ts src/lib/dashboard.test.ts",
     "recompute": "node scripts/recompute-projections.ts"
   },
   "dependencies": {
