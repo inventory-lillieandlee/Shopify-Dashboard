@@ -39,25 +39,33 @@ create temporary table _ll_demo (
   snap_mins_ago      integer
 );
 
+-- !!  DEMO inventory levels tuned for tier-spread demonstration — NOT real data;
+--     overwritten by Shopify ingestion (Phase C). The shopify_units below were
+--     chosen against the Phase A deriveThresholds cutoffs (R = lead + safety;
+--     yellow = R + round(0.22*lead); red = R + round(0.10*lead)) so the engine's
+--     recompute lands a legible spread (~3 critical / 3 red / 3 yellow / 10 ok)
+--     instead of a wall of critical-by-overdue. Hip & Joint is kept critical-by-
+--     overdue (the roadmap worked example); 250mg CBD is kept critical-by-spike
+--     (its inventory is untouched — the 22% spike stays the driver).
 insert into _ll_demo
   (shopify_product_id, name, category, lead_time_days, shopify_units, ddr, dsr, spike_pct, alert_level, reorder_offset, snap_mins_ago)
 values
   -- Supplement Chews (lead 98)
   (7706691436753, 'Hip & Joint Chews — Flex + Relief',            'supplement_chews', 98,  378, 13.5,  28,  6, 'critical', -35, 14),
-  (7706691731665, 'Allergy Chews — Soothe + Shield',             'supplement_chews', 98,  504,  7.0,  72, 11, 'red',        9, 18),
-  (7706691371217, 'Multi-Vitamin Chews — Energy + Defense',      'supplement_chews', 98,  828,  6.0, 138, 12, 'yellow',    20, 50),
+  (7706691731665, 'Allergy Chews — Soothe + Shield',             'supplement_chews', 98,  910,  7.0, 130, 11, 'red',        2, 18),
+  (7706691371217, 'Multi-Vitamin Chews — Energy + Defense',      'supplement_chews', 98,  864,  6.0, 144, 12, 'yellow',    16, 50),
   (7706691272913, 'Probiotic Digestive Chews — Flora + Flourish','supplement_chews', 98, 1260,  6.0, 210,  1, 'ok',        60, 70),
-  (7706691207377, 'Skin & Coat Chews — Luster + Nourish',        'supplement_chews', 98,  600,  5.0, 120,  2, 'yellow',    25, 65),
+  (7706691207377, 'Skin & Coat Chews — Luster + Nourish',        'supplement_chews', 98,  730,  5.0, 146,  2, 'yellow',    18, 65),
   (7706692649169, 'Activ-Multi-V — Energy + Defense',            'supplement_chews', 98, 1095,  3.0, 365,  0, 'ok',       120, 80),
   -- CBD (lead 49)
-  (7706692026577, '1000mg CBD Oil — Calm + Comfort',             'cbd',              49,  770,  7.0, 110,  5, 'yellow',    30,  9),
+  (7706692026577, '1000mg CBD Oil — Calm + Comfort',             'cbd',              49,  770,  7.0, 110,  5, 'ok',        31,  9),
   (7706691961041, '750mg CBD Oil — Calm + Comfort',              'cbd',              49, 1080,  6.0, 180,  2, 'ok',        50, 15),
   (7706691993809, '250mg CBD Oil — Calm + Comfort',              'cbd',              49,  720,  6.0, 120, 22, 'critical',  41, 21),
-  (7706692157649, 'CBD Soft Chews — Calm + Comfort',             'cbd',              49,  240,  4.0,  60,  8, 'red',        6, 27),
+  (7706692157649, 'CBD Soft Chews — Calm + Comfort',             'cbd',              49,  328,  4.0,  82,  8, 'red',        3, 27),
   (7706690846929, '500mg CBD Balm — Relief + Restore',           'cbd',              49,  480,  2.0, 240,  1, 'ok',        90, 45),
   -- Treats (lead 98)
   (7706691698897, 'Beef Heart Treats — Strength + Health',       'treats',           98, 1400,  8.0, 175, 13, 'ok',        40, 22),
-  (7706691666129, 'Beef Liver Treats — Protein + Power',         'treats',           98,  425,  5.0,  85,  4, 'red',       13, 40),
+  (7706691666129, 'Beef Liver Treats — Protein + Power',         'treats',           98,  675,  5.0, 135,  4, 'red',        7, 40),
   (7706692092113, 'Beef Tendon Chews — Dental + Joint',          'treats',           98,  377,  9.2,  41,  9, 'critical', -12, 33),
   (7706692387025, 'Beef Trachea Chews — Dental + Joint',         'treats',           98,  580,  4.0, 145,  3, 'yellow',    18, 12),
   (7706691567825, 'Chicken Breast Treats — Lean + Protein',      'treats',           98, 1400,  7.0, 200,  4, 'ok',        55, 33),
