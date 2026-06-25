@@ -1,0 +1,191 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-fraunces);
+  --font-heading: var(--font-fraunces);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-brand: var(--brand);
+  --color-brand-sage: var(--brand-sage);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* ----------------------------------------------------------------------------
+   Lillie & Lee brand theme (light). Forest green + warm cream surfaces.
+   Status colors are NOT defined here — they live as solid chips in the
+   components so brand warmth never dilutes data legibility.
+---------------------------------------------------------------------------- */
+:root {
+  --brand: #283c2c; /* forest/pine green — logo + primary */
+  --brand-deep: #1c2c20;
+  --brand-sage: #5f7e62;
+
+  --background: #f6f2e9; /* warm cream app */
+  --foreground: #161d17; /* ink */
+  --card: #fcfaf5; /* warm white card */
+  --card-foreground: #161d17;
+  --popover: #fcfaf5;
+  --popover-foreground: #161d17;
+  --primary: #283c2c;
+  --primary-foreground: #f6f2e9;
+  --secondary: #e7efe4; /* brand tint */
+  --secondary-foreground: #233429;
+  --muted: #efeadf; /* warm muted surface */
+  --muted-foreground: #565449; /* warm secondary text — AA on cream */
+  --accent: #e7efe4;
+  --accent-foreground: #233429;
+  --destructive: #b91c1c;
+  --border: #e6dfcf; /* warm hairline */
+  --input: #e6dfcf;
+  --ring: #283c2c; /* brand focus ring */
+  --chart-1: #283c2c;
+  --chart-2: #5f7e62;
+  --chart-3: #a5e0a5;
+  --chart-4: #c9b27a;
+  --chart-5: #9aa0c9;
+  --radius: 0.7rem;
+  --sidebar: #fcfaf5;
+  --sidebar-foreground: #161d17;
+  --sidebar-primary: #283c2c;
+  --sidebar-primary-foreground: #f6f2e9;
+  --sidebar-accent: #e7efe4;
+  --sidebar-accent-foreground: #233429;
+  --sidebar-border: #e6dfcf;
+  --sidebar-ring: #283c2c;
+}
+
+.dark {
+  --brand: #c7dcc2;
+  --brand-deep: #9dbe9f;
+  --brand-sage: #9dbe9f;
+
+  --background: #0e130f;
+  --foreground: #ecefe9;
+  --card: #161d17;
+  --card-foreground: #ecefe9;
+  --popover: #161d17;
+  --popover-foreground: #ecefe9;
+  --primary: #c7dcc2;
+  --primary-foreground: #161d17;
+  --secondary: #1e261f;
+  --secondary-foreground: #ecefe9;
+  --muted: #1e261f;
+  --muted-foreground: #aab1a4; /* AA on dark green */
+  --accent: #1e261f;
+  --accent-foreground: #ecefe9;
+  --destructive: #f87171;
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: #7fa382;
+  --chart-1: #c7dcc2;
+  --chart-2: #9dbe9f;
+  --chart-3: #a5e0a5;
+  --chart-4: #c9b27a;
+  --chart-5: #9aa0c9;
+  --sidebar: #161d17;
+  --sidebar-foreground: #ecefe9;
+  --sidebar-primary: #c7dcc2;
+  --sidebar-primary-foreground: #161d17;
+  --sidebar-accent: #1e261f;
+  --sidebar-accent-foreground: #ecefe9;
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: #7fa382;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* ============================================================================
+   Brand atmosphere (visual only) — warm layered radial wash + a11y fallbacks.
+   ============================================================================ */
+
+/* Soft, low-contrast cream/sage wash so the elevated surfaces float over it.
+   Un-layered so it overrides the @layer base `bg-background`. */
+body {
+  background-color: #f6f2e9;
+  background-image:
+    radial-gradient(1100px 620px at 10% -8%, rgba(40, 60, 44, 0.07), transparent 60%),
+    radial-gradient(1000px 720px at 100% 0%, rgba(231, 239, 228, 0.6), transparent 55%),
+    radial-gradient(1200px 900px at 90% 110%, rgba(239, 231, 213, 0.7), transparent 60%),
+    radial-gradient(820px 620px at -6% 102%, rgba(231, 239, 228, 0.5), transparent 60%);
+  background-attachment: fixed;
+}
+
+.dark body {
+  background-color: #0e130f;
+  background-image:
+    radial-gradient(1100px 620px at 10% -8%, rgba(95, 126, 98, 0.18), transparent 60%),
+    radial-gradient(1000px 720px at 100% 0%, rgba(40, 60, 44, 0.5), transparent 55%),
+    radial-gradient(1200px 900px at 90% 110%, rgba(28, 44, 32, 0.6), transparent 60%);
+}
+
+/* Accessibility: reduced transparency → flatten the atmospheric wash to a solid
+   surface (panels are already opaque). */
+@media (prefers-reduced-transparency: reduce) {
+  body {
+    background-image: none !important;
+  }
+}
+
+/* Accessibility: honor reduced motion — disables entrance animations, hover
+   transitions, and the demo-banner pulse. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
