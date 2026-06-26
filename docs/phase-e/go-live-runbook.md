@@ -82,6 +82,13 @@ cron to anon reads is only safe once anon SELECT is restored.
 
 ---
 
+## Pre-production cleanup
+- **Resolve 2 moderate npm-audit vulns (transitive via `@supabase/ssr`) before go-live; do not
+  `audit fix --force` without testing.** (`--force` can pull breaking major bumps; verify
+  `tsc` + build + the auth flow after any fix.)
+
+---
+
 ## Standing rule — every `/api/*` route MUST self-authorize
 The middleware allowlists `/api/*` (so cron/team APIs aren't redirected and can return their own
 JSON 401/403). Therefore **the middleware provides NO protection for API routes** — each one must
