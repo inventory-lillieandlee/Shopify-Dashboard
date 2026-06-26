@@ -34,3 +34,6 @@ Thumbs.db
 
 # Claude Code local session/config
 .claude/
+
+# packed skill archives — the unpacked .claude/skills/<name>/ dir is the canonical form
+*.skill
