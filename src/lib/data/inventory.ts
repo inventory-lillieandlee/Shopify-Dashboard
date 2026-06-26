@@ -1,4 +1,4 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import type { AlertLevel, Category, InventoryRow } from "./types";
 
 // Minimal shapes for the columns we select (no generated DB types yet).
@@ -45,7 +45,10 @@ const toNum = (v: number | string | null | undefined): number | null =>
  * signature without touching any component.
  */
 export async function getInventoryRows(): Promise<InventoryRow[]> {
-  const supabase = createSupabaseServerClient();
+  // Cookie/session-aware client: anon when there's no session (dormant mode →
+  // identical output), the signed-in user's session once auth is live. The seam's
+  // signature, queries, and returned shape are unchanged.
+  const supabase = await createServerComponentClient();
 
   const [products, snapshots, projections] = await Promise.all([
     supabase

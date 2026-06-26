@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { getInventoryRows } from "@/lib/data/inventory";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
@@ -7,6 +7,7 @@ import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SettingsConfigCard } from "@/components/settings-config-card";
 import { SettingsTable } from "@/components/settings-table";
+import { TeamPanel } from "@/components/team-panel";
 
 // Live (read-only) from Supabase via the same anon seam as the dashboard.
 export const dynamic = "force-dynamic";
@@ -88,23 +89,7 @@ export default async function SettingsPage({
             </section>
           </div>
         ) : (
-          <section
-            className={cn(
-              surfacePanel,
-              "animate-in flex flex-col items-center gap-3 p-10 text-center duration-500 fade-in",
-            )}
-          >
-            <span className="flex size-11 items-center justify-center rounded-full bg-muted text-brand-sage">
-              <Users className="size-5" />
-            </span>
-            <div>
-              <h2 className="font-display text-lg font-semibold text-brand">Team</h2>
-              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-                Invite-only access and user management arrive in Stage 2 (built dormant —
-                the dashboard stays public until auth is switched on at go-live).
-              </p>
-            </div>
-          </section>
+          <TeamPanel />
         )}
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">

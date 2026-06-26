@@ -7,11 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/lib/projections/engine.test.ts src/lib/dashboard.test.ts src/lib/alerts/policy.test.ts src/lib/alerts/dedup.test.ts",
+    "test": "node --test src/lib/projections/engine.test.ts src/lib/dashboard.test.ts src/lib/alerts/policy.test.ts src/lib/alerts/dedup.test.ts src/lib/auth/policy.test.ts",
     "recompute": "node scripts/recompute-projections.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
