@@ -5,12 +5,8 @@
 //
 //   node scripts/recompute-projections.ts        # prints SUMMARY + SQL
 import { readFileSync, existsSync } from "node:fs";
-import {
-  computeDDR,
-  computeProjection,
-  projected7d,
-  DEFAULT_CONFIG,
-} from "../src/lib/projections/engine.ts";
+// Recompute math is shared with the cron route — single source, no drift.
+import { computeSkuProjection } from "../src/lib/projections/recompute.ts";
 
 function loadEnv(f: string) {
   if (!existsSync(f)) return;
@@ -64,31 +60,24 @@ for (const r of renewals) {
   if (d >= today && d <= horizon30) renewalsByProduct.set(r.product_id, (renewalsByProduct.get(r.product_id) ?? 0) + num(r.expected_units));
 }
 
-const growth = DEFAULT_CONFIG.growth;
-const rows: { p: Product; units: number; r: ReturnType<typeof computeProjection> }[] = [];
+const rows: { p: Product; units: number; r: ReturnType<typeof computeSkuProjection> }[] = [];
 
 for (const p of products) {
   const snap = latestSnap.get(p.id);
   const proj = latestProj.get(p.id);
   if (!snap) { console.error(`! ${p.name}: no inventory_snapshot — skipped`); continue; }
 
-  const seededDDR = num(proj?.daily_demand_rate);
-  // DEMO bootstrap to reconstruct seeded run-rate — REPLACE with units_sold_30d/30
-  // when real order history lands. (ddr_out == ddr_in ⇒ idempotent.)
-  const base_daily_demand = seededDDR / growth;
-  const upcoming_renewals_30d = renewalsByProduct.get(p.id) ?? 0;
-  const ddr = computeDDR({ base_daily_demand, upcoming_renewals_30d }, DEFAULT_CONFIG);
-
-  const seededSpike = num(proj?.spike_pct);
-  // DEMO back-derivation: no 7-day sales history exists, so reconstruct actual_7d
-  // from the seeded spike — REPLACE with real units-sold-last-7-days when order
-  // history lands. Preserves the seeded spike (idempotent).
-  const actual_7d = projected7d(ddr) * (1 + seededSpike / 100);
-
-  const r = computeProjection({
-    base_daily_demand, upcoming_renewals_30d, shopify_units: snap.shopify_units,
-    lead_time_days: p.lead_time_days, safety_stock_days: p.safety_stock_days, actual_7d, today,
-  }, DEFAULT_CONFIG);
+  // DEMO bootstrap (seeded DDR → base run-rate; seeded spike → actual_7d) lives in
+  // computeSkuProjection — REPLACE with units_sold_30d/30 + real 7-day sales later.
+  const r = computeSkuProjection({
+    shopify_units: snap.shopify_units,
+    seededDDR: num(proj?.daily_demand_rate),
+    seededSpike: num(proj?.spike_pct),
+    upcoming_renewals_30d: renewalsByProduct.get(p.id) ?? 0,
+    lead_time_days: p.lead_time_days,
+    safety_stock_days: p.safety_stock_days,
+    today,
+  });
   rows.push({ p, units: snap.shopify_units, r });
 }
 
