@@ -9,7 +9,6 @@ import {
 import { CATEGORIES, type AlertLevel, type Category } from "@/lib/data/types";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
-import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SummaryCards } from "@/components/summary-cards";
 import { TableControls } from "@/components/table-controls";
@@ -60,7 +59,6 @@ export default async function Page({
 
   return (
     <div className="min-h-screen">
-      <DemoBanner />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
         <SiteHeader />
 

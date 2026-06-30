@@ -7,6 +7,7 @@ import { runDispatch } from "@/lib/alerts/dispatch";
 import { readActiveRecipients } from "@/lib/alerts/recipients";
 import type { PriorFire } from "@/lib/alerts/dedup";
 import { readRecomputeInputs, computeAll, persistProjections } from "@/lib/projections/recompute";
+import { loadProjectionSettings } from "@/lib/config/projection-config";
 import { refreshInventory } from "@/lib/shopify/sync";
 
 export const runtime = "nodejs";
@@ -38,9 +39,10 @@ export async function GET(req: Request) {
       inventory = { refreshed: true, ...(await refreshInventory(admin, now)) };
     }
 
-    // (a) recompute on real demand
+    // (a) recompute on real demand, using the admin-editable config + thresholds
     const inputs = await readRecomputeInputs(readDb, now);
-    const computed = computeAll(inputs, now);
+    const settings = await loadProjectionSettings(readDb);
+    const computed = computeAll(inputs, now, settings.config, settings.thresholdsByCategory);
     const recompute = dryRun
       ? { persisted: false, wouldWrite: computed.length }
       : { persisted: true, written: await persistProjections(admin!, computed, now) };

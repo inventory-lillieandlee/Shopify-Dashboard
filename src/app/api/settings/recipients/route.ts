@@ -1,6 +1,5 @@
 import type { NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,22 +7,26 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LEVELS = new Set(["yellow", "red", "critical"]);
 
-// Manage alert recipients. ADMIN-ONLY — self-authorizes (403 without an admin
-// session, incl. during dormancy). Service-role only (emails are private).
+// Manage alert recipients. ADMIN-ONLY (403/500 via requireAdmin). Service-role only
+// (emails are private).
 export async function GET() {
-  const { error } = await requireAdmin();
+  const { admin, error } = await requireAdmin();
   if (error) return error;
-  const admin = createSupabaseAdminClient();
-  const { data, error: e } = await admin
-    .from("alert_recipients")
-    .select("id, email, min_level, active")
-    .order("email");
-  if (e) return Response.json({ error: "could not list recipients" }, { status: 500 });
-  return Response.json({ recipients: data ?? [] });
+  try {
+    const { data, error: e } = await admin
+      .from("alert_recipients")
+      .select("id, email, min_level, active")
+      .order("email");
+    if (e) throw new Error(e.message);
+    return Response.json({ recipients: data ?? [] });
+  } catch (e) {
+    console.warn("recipients list failed:", String(e));
+    return Response.json({ error: "could not list recipients" }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const { error } = await requireAdmin();
+  const { admin, error } = await requireAdmin();
   if (error) return error;
   let body: unknown;
   try {
@@ -39,21 +42,29 @@ export async function POST(req: NextRequest) {
   if (typeof min_level !== "string" || !LEVELS.has(min_level)) {
     return Response.json({ error: "min_level must be yellow|red|critical" }, { status: 400 });
   }
-  const admin = createSupabaseAdminClient();
-  const { error: e } = await admin
-    .from("alert_recipients")
-    .upsert({ email, min_level, active: true }, { onConflict: "email" });
-  if (e) return Response.json({ error: "could not add recipient" }, { status: 500 });
-  return Response.json({ ok: true }, { status: 201 });
+  try {
+    const { error: e } = await admin
+      .from("alert_recipients")
+      .upsert({ email, min_level, active: true }, { onConflict: "email" });
+    if (e) throw new Error(e.message);
+    return Response.json({ ok: true }, { status: 201 });
+  } catch (e) {
+    console.warn("recipient add failed:", String(e));
+    return Response.json({ error: "could not add recipient" }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
-  const { error } = await requireAdmin();
+  const { admin, error } = await requireAdmin();
   if (error) return error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id required" }, { status: 400 });
-  const admin = createSupabaseAdminClient();
-  const { error: e } = await admin.from("alert_recipients").delete().eq("id", id);
-  if (e) return Response.json({ error: "could not remove recipient" }, { status: 500 });
-  return Response.json({ ok: true });
+  try {
+    const { error: e } = await admin.from("alert_recipients").delete().eq("id", id);
+    if (e) throw new Error(e.message);
+    return Response.json({ ok: true });
+  } catch (e) {
+    console.warn("recipient remove failed:", String(e));
+    return Response.json({ error: "could not remove recipient" }, { status: 500 });
+  }
 }

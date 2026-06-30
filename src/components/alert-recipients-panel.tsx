@@ -28,7 +28,10 @@ export function AlertRecipientsPanel() {
   async function refresh() {
     const res = await fetch("/api/settings/recipients", { cache: "no-store" });
     if (res.status === 403) return setLoad({ state: "forbidden" });
-    if (!res.ok) return setLoad({ state: "error", message: `Failed (${res.status})` });
+    if (!res.ok) {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      return setLoad({ state: "error", message: j.error || `Failed (${res.status})` });
+    }
     const json = (await res.json()) as { recipients: Recipient[] };
     setLoad({ state: "ready", recipients: json.recipients });
   }

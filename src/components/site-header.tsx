@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
+import { UserMenu } from "@/components/user-menu";
 
 export function SiteHeader() {
   return (
@@ -30,8 +31,9 @@ export function SiteHeader() {
           </p>
         </div>
       </div>
-      <div className="text-xs text-muted-foreground sm:text-right">
-        Phase 1 · 19 core SKUs
+      <div className="flex items-center gap-3 self-end sm:self-auto">
+        <span className="hidden text-xs text-muted-foreground sm:inline">19 SKUs · live</span>
+        <UserMenu />
       </div>
     </header>
   );

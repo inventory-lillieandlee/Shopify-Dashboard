@@ -13,6 +13,7 @@ import {
   DEFAULT_CONFIG,
   type ProjectionConfig,
   type ProjectionResult,
+  type Thresholds,
 } from "./engine.ts";
 
 const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
@@ -29,10 +30,12 @@ export interface SkuDemandInput {
   today: Date;
 }
 
-/** THE recompute math (single source) — real demand in, ProjectionResult out. */
+/** THE recompute math (single source) — real demand in, ProjectionResult out.
+ *  `thresholds` (admin-edited per-category cutoffs) overrides the derived defaults. */
 export function computeSkuProjection(
   input: SkuDemandInput,
   config: ProjectionConfig = DEFAULT_CONFIG,
+  thresholds?: Thresholds,
 ): ProjectionResult {
   const base_daily_demand = Math.max(input.units_sold_30d, 0) / 30;
   const actual_7d = Math.max(input.units_sold_7d, 0);
@@ -47,6 +50,7 @@ export function computeSkuProjection(
       today: input.today,
     },
     config,
+    thresholds,
   );
 }
 
@@ -128,20 +132,30 @@ export interface ComputedProjection {
   result: ProjectionResult;
 }
 
-/** Compute one projection per active SKU that has an inventory snapshot. */
-export function computeAll(inputs: RecomputeInputs, today: Date): ComputedProjection[] {
+/** Compute one projection per active SKU that has an inventory snapshot. Per-category
+ *  thresholds (admin-edited) override the derived defaults when provided. */
+export function computeAll(
+  inputs: RecomputeInputs,
+  today: Date,
+  config: ProjectionConfig = DEFAULT_CONFIG,
+  thresholdsByCategory?: Map<string, Thresholds>,
+): ComputedProjection[] {
   const out: ComputedProjection[] = [];
   for (const p of inputs.products) {
     if (!inputs.latestSnapUnits.has(p.id)) continue; // no inventory snapshot → skip
-    const result = computeSkuProjection({
-      shopify_units: inputs.latestSnapUnits.get(p.id) ?? 0,
-      units_sold_30d: inputs.demand30.get(p.id) ?? 0,
-      units_sold_7d: inputs.demand7.get(p.id) ?? 0,
-      upcoming_renewals_30d: inputs.renewals30d.get(p.id) ?? 0,
-      lead_time_days: p.lead_time_days,
-      safety_stock_days: p.safety_stock_days,
-      today,
-    });
+    const result = computeSkuProjection(
+      {
+        shopify_units: inputs.latestSnapUnits.get(p.id) ?? 0,
+        units_sold_30d: inputs.demand30.get(p.id) ?? 0,
+        units_sold_7d: inputs.demand7.get(p.id) ?? 0,
+        upcoming_renewals_30d: inputs.renewals30d.get(p.id) ?? 0,
+        lead_time_days: p.lead_time_days,
+        safety_stock_days: p.safety_stock_days,
+        today,
+      },
+      config,
+      thresholdsByCategory?.get(p.category),
+    );
     out.push({ product_id: p.id, result });
   }
   return out;

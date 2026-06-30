@@ -1,16 +1,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { getInventoryRows } from "@/lib/data/inventory";
 import { cn } from "@/lib/utils";
-import { surfacePanel } from "@/lib/surface";
-import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
-import { SettingsConfigCard } from "@/components/settings-config-card";
-import { SettingsTable } from "@/components/settings-table";
+import { SettingsEditor } from "@/components/settings-editor";
 import { TeamPanel } from "@/components/team-panel";
 import { AlertRecipientsPanel } from "@/components/alert-recipients-panel";
 
-// Live (read-only) from Supabase via the same anon seam as the dashboard.
 export const dynamic = "force-dynamic";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -48,11 +43,8 @@ export default async function SettingsPage({
   const raw = typeof sp.tab === "string" ? sp.tab : "settings";
   const tab = raw === "team" || raw === "alerts" ? raw : "settings";
 
-  const rows = await getInventoryRows();
-
   return (
     <div className="min-h-screen">
-      <DemoBanner />
       <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
         <SiteHeader />
 
@@ -76,28 +68,7 @@ export default async function SettingsPage({
           </Link>
         </div>
 
-        {tab === "settings" ? (
-          <div className="animate-in space-y-6 duration-500 fade-in slide-in-from-bottom-2">
-            <SettingsConfigCard />
-            <section className="space-y-3">
-              <div className="px-1">
-                <h2 className="font-display text-lg font-semibold text-brand">
-                  Per-SKU configuration
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Read-only · {rows.length} active SKUs · thresholds derived from lead time + safety stock
-                </p>
-              </div>
-              <div className={cn(surfacePanel, "overflow-hidden")}>
-                <SettingsTable rows={rows} />
-              </div>
-            </section>
-          </div>
-        ) : tab === "team" ? (
-          <TeamPanel />
-        ) : (
-          <AlertRecipientsPanel />
-        )}
+        {tab === "settings" ? <SettingsEditor /> : tab === "team" ? <TeamPanel /> : <AlertRecipientsPanel />}
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           Lillie &amp; Lee · Settings · Shopify location on-hand · excludes 3PL warehouse

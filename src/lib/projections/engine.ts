@@ -168,6 +168,10 @@ export interface ProjectionResult {
 export function computeProjection(
   input: SkuInput,
   config: ProjectionConfig = DEFAULT_CONFIG,
+  // Optional explicit DSR thresholds (e.g. admin-edited per-category values from the
+  // DB). When omitted, falls back to deriveThresholds() — so existing callers are
+  // unaffected.
+  thresholdsOverride?: Thresholds,
 ): ProjectionResult {
   const ddr = computeDDR(
     { base_daily_demand: input.base_daily_demand, upcoming_renewals_30d: input.upcoming_renewals_30d },
@@ -178,7 +182,8 @@ export function computeProjection(
   const reorder_date = computeReorderDate(input.today, dsr, input.lead_time_days, input.safety_stock_days);
   const overdue = Number.isFinite(horizon) && horizon < 0;
   const spike_pct = computeSpikePct(input.actual_7d, projected7d(ddr));
-  const thresholds = deriveThresholds(input.lead_time_days, input.safety_stock_days, config);
+  const thresholds =
+    thresholdsOverride ?? deriveThresholds(input.lead_time_days, input.safety_stock_days, config);
   const alert_level = classifyAlert(dsr, overdue, spike_pct, thresholds, config);
   return {
     daily_demand_rate: ddr,

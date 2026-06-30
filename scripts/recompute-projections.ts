@@ -7,6 +7,7 @@
 import { readFileSync, existsSync } from "node:fs";
 // Recompute math is shared with the cron route — single source, no drift.
 import { computeSkuProjection } from "../src/lib/projections/recompute.ts";
+import { buildProjectionSettings } from "../src/lib/config/projection-config.ts";
 
 function loadEnv(f: string) {
   if (!existsSync(f)) return;
@@ -49,6 +50,9 @@ const products: Product[] = await rest("products?active=eq.true&select=id,shopif
 const snaps: Snap[] = await rest("inventory_snapshots?select=product_id,shopify_units,snapshot_at&order=snapshot_at.desc");
 const demandRows: Demand[] = await rest("sku_demand?select=product_id,units_sold_30d,units_sold_7d");
 const renewals: Renewal[] = await rest("recharge_renewals?select=product_id,expected_units,renewal_date");
+const appCfg = await rest("app_config?select=growth_pct,spike_threshold_pct&limit=1");
+const catThresh = await rest("category_thresholds?select=category,yellow_days,red_days,critical_days");
+const settings = buildProjectionSettings(appCfg?.[0] ?? null, catThresh ?? []);
 
 const latestSnap = new Map<string, Snap>();
 for (const s of snaps) if (!latestSnap.has(s.product_id)) latestSnap.set(s.product_id, s);
@@ -76,7 +80,7 @@ for (const p of products) {
     lead_time_days: p.lead_time_days,
     safety_stock_days: p.safety_stock_days,
     today,
-  });
+  }, settings.config, settings.thresholdsByCategory.get(p.category));
   rows.push({ p, units: snap.shopify_units, r });
 }
 
