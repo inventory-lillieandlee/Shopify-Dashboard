@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test src/lib/projections/engine.test.ts src/lib/dashboard.test.ts src/lib/alerts/policy.test.ts src/lib/alerts/dedup.test.ts src/lib/auth/policy.test.ts",
+    "test": "node --test src/lib/projections/engine.test.ts src/lib/dashboard.test.ts src/lib/alerts/policy.test.ts src/lib/alerts/dedup.test.ts src/lib/auth/policy.test.ts src/lib/shopify/demand.test.ts",
     "recompute": "node scripts/recompute-projections.ts"
   },
   "dependencies": {

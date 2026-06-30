@@ -36,7 +36,7 @@ const rest = async (path: string) => {
 
 interface Product { id: string; shopify_product_id: number; name: string; category: string; lead_time_days: number; safety_stock_days: number; }
 interface Snap { product_id: string; shopify_units: number; snapshot_at: string; }
-interface Proj { product_id: string; daily_demand_rate: number | string | null; spike_pct: number | string | null; calculated_at: string; }
+interface Demand { product_id: string; units_sold_30d: number | string | null; units_sold_7d: number | string | null; }
 interface Renewal { product_id: string; expected_units: number; renewal_date: string; }
 
 const num = (v: unknown) => (v === null || v === undefined ? 0 : Number(v));
@@ -47,13 +47,13 @@ horizon30.setUTCDate(horizon30.getUTCDate() + 30);
 
 const products: Product[] = await rest("products?active=eq.true&select=id,shopify_product_id,name,category,lead_time_days,safety_stock_days&order=name");
 const snaps: Snap[] = await rest("inventory_snapshots?select=product_id,shopify_units,snapshot_at&order=snapshot_at.desc");
-const projs: Proj[] = await rest("projections?select=product_id,daily_demand_rate,spike_pct,calculated_at&order=calculated_at.desc");
+const demandRows: Demand[] = await rest("sku_demand?select=product_id,units_sold_30d,units_sold_7d");
 const renewals: Renewal[] = await rest("recharge_renewals?select=product_id,expected_units,renewal_date");
 
 const latestSnap = new Map<string, Snap>();
 for (const s of snaps) if (!latestSnap.has(s.product_id)) latestSnap.set(s.product_id, s);
-const latestProj = new Map<string, Proj>();
-for (const p of projs) if (!latestProj.has(p.product_id)) latestProj.set(p.product_id, p);
+const demandByProduct = new Map<string, Demand>();
+for (const d of demandRows) demandByProduct.set(d.product_id, d);
 const renewalsByProduct = new Map<string, number>();
 for (const r of renewals) {
   const d = new Date(r.renewal_date);
@@ -64,15 +64,14 @@ const rows: { p: Product; units: number; r: ReturnType<typeof computeSkuProjecti
 
 for (const p of products) {
   const snap = latestSnap.get(p.id);
-  const proj = latestProj.get(p.id);
+  const dem = demandByProduct.get(p.id);
   if (!snap) { console.error(`! ${p.name}: no inventory_snapshot — skipped`); continue; }
 
-  // DEMO bootstrap (seeded DDR → base run-rate; seeded spike → actual_7d) lives in
-  // computeSkuProjection — REPLACE with units_sold_30d/30 + real 7-day sales later.
+  // REAL demand from sku_demand: units_sold_30d/30 + real 7-day sales. renewals 0.
   const r = computeSkuProjection({
     shopify_units: snap.shopify_units,
-    seededDDR: num(proj?.daily_demand_rate),
-    seededSpike: num(proj?.spike_pct),
+    units_sold_30d: num(dem?.units_sold_30d),
+    units_sold_7d: num(dem?.units_sold_7d),
     upcoming_renewals_30d: renewalsByProduct.get(p.id) ?? 0,
     lead_time_days: p.lead_time_days,
     safety_stock_days: p.safety_stock_days,

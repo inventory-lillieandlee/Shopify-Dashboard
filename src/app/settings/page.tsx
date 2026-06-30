@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SettingsConfigCard } from "@/components/settings-config-card";
 import { SettingsTable } from "@/components/settings-table";
 import { TeamPanel } from "@/components/team-panel";
+import { AlertRecipientsPanel } from "@/components/alert-recipients-panel";
 
 // Live (read-only) from Supabase via the same anon seam as the dashboard.
 export const dynamic = "force-dynamic";
@@ -44,7 +45,8 @@ export default async function SettingsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const sp = await searchParams;
-  const tab = (typeof sp.tab === "string" ? sp.tab : "") === "team" ? "team" : "settings";
+  const raw = typeof sp.tab === "string" ? sp.tab : "settings";
+  const tab = raw === "team" || raw === "alerts" ? raw : "settings";
 
   const rows = await getInventoryRows();
 
@@ -61,6 +63,9 @@ export default async function SettingsPage({
             </TabLink>
             <TabLink href="/settings?tab=team" active={tab === "team"}>
               Team
+            </TabLink>
+            <TabLink href="/settings?tab=alerts" active={tab === "alerts"}>
+              Alerts
             </TabLink>
           </nav>
           <Link
@@ -88,12 +93,14 @@ export default async function SettingsPage({
               </div>
             </section>
           </div>
-        ) : (
+        ) : tab === "team" ? (
           <TeamPanel />
+        ) : (
+          <AlertRecipientsPanel />
         )}
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
-          Lillie &amp; Lee · Settings (read-only) · Shopify location on-hand · demand &amp; projections estimated pending order history
+          Lillie &amp; Lee · Settings · Shopify location on-hand · excludes 3PL warehouse
         </footer>
       </main>
     </div>

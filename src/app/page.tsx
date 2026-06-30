@@ -97,8 +97,7 @@ export default async function Page({
         <ReorderQueue rows={queue} />
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
-          Lillie &amp; Lee · Shopify location on-hand · demand &amp; projections
-          estimated pending order history
+          Lillie &amp; Lee · Shopify location on-hand · excludes 3PL warehouse
         </footer>
       </main>
     </div>

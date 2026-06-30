@@ -1,4 +1,5 @@
 import { createServerComponentClient } from "@/lib/supabase/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AlertLevel, Category, InventoryRow } from "./types";
 
 // Minimal shapes for the columns we select (no generated DB types yet).
@@ -45,11 +46,18 @@ const toNum = (v: number | string | null | undefined): number | null =>
  * signature without touching any component.
  */
 export async function getInventoryRows(): Promise<InventoryRow[]> {
-  // Cookie/session-aware client: anon when there's no session (dormant mode →
-  // identical output), the signed-in user's session once auth is live. The seam's
-  // signature, queries, and returned shape are unchanged.
-  const supabase = await createServerComponentClient();
+  // Public seam — cookie/session-aware client (anon when no session → identical
+  // output in dormant mode; the signed-in user's session once auth is live).
+  // Signature, queries, and returned shape are unchanged.
+  return getInventoryRowsWith(await createServerComponentClient());
+}
 
+/**
+ * Same merge as the seam but with an INJECTABLE client. The 6h cron passes the
+ * service-role admin client — it has no user session and, after the RLS cutover,
+ * the anon path returns nothing. The dashboard always uses getInventoryRows().
+ */
+export async function getInventoryRowsWith(supabase: SupabaseClient): Promise<InventoryRow[]> {
   const [products, snapshots, projections] = await Promise.all([
     supabase
       .from("products")

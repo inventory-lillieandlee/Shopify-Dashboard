@@ -45,3 +45,20 @@ export type AlertLogLevel = (typeof ALERT_LOG_LEVELS)[number];
 export function isWritableAlertLevel(level: string): level is AlertLogLevel {
   return (ALERT_LOG_LEVELS as readonly string[]).includes(level);
 }
+
+// ── recipient routing ────────────────────────────────────────────────────────
+export interface RecipientLike {
+  email: string;
+  /** lowest alert level this recipient wants. */
+  min_level: string;
+}
+
+/**
+ * Emails to notify for an alert at `level`: active recipients whose floor is met
+ * (min_level ≤ level). `ok` notifies no one. Pure — drives the DB-backed routing.
+ */
+export function recipientsForLevel(recipients: RecipientLike[], level: string): string[] {
+  const L = levelRank(level);
+  if (L <= 0) return []; // ok / unknown → nobody
+  return recipients.filter((r) => levelRank(r.min_level) <= L).map((r) => r.email);
+}

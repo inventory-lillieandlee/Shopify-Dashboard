@@ -5,6 +5,7 @@ import {
   meetsMinLevel,
   parseRecipients,
   isWritableAlertLevel,
+  recipientsForLevel,
 } from "./policy.ts";
 
 // ── recipient parsing ────────────────────────────────────────────────────────
@@ -62,4 +63,28 @@ test("isWritableAlertLevel: ok / spike / garbage are rejected (never insert)", (
   assert.equal(isWritableAlertLevel("spike"), false);
   assert.equal(isWritableAlertLevel(""), false);
   assert.equal(isWritableAlertLevel("Critical"), false); // case-sensitive on purpose
+});
+
+// ── recipientsForLevel: DB-backed per-recipient routing ──────────────────────
+const RECIPIENTS = [
+  { email: "ops@x.com", min_level: "red" },
+  { email: "owner@x.com", min_level: "critical" },
+  { email: "analyst@x.com", min_level: "yellow" },
+];
+test("recipientsForLevel: critical reaches everyone", () => {
+  assert.deepEqual(recipientsForLevel(RECIPIENTS, "critical").sort(), [
+    "analyst@x.com",
+    "ops@x.com",
+    "owner@x.com",
+  ].sort());
+});
+test("recipientsForLevel: red excludes the critical-only recipient", () => {
+  assert.deepEqual(recipientsForLevel(RECIPIENTS, "red").sort(), ["analyst@x.com", "ops@x.com"].sort());
+});
+test("recipientsForLevel: yellow reaches only the yellow recipient", () => {
+  assert.deepEqual(recipientsForLevel(RECIPIENTS, "yellow"), ["analyst@x.com"]);
+});
+test("recipientsForLevel: ok notifies nobody; empty list → []", () => {
+  assert.deepEqual(recipientsForLevel(RECIPIENTS, "ok"), []);
+  assert.deepEqual(recipientsForLevel([], "critical"), []);
 });

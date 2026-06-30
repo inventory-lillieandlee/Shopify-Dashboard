@@ -1,13 +1,15 @@
-// Shared recompute core. The per-SKU bootstrap math lives HERE only — both the
-// 6h cron route and scripts/recompute-projections.ts call computeSkuProjection so
-// the two can never drift. Reads via any Supabase client; persistProjections
-// writes via the service-role admin client (server-only).
+// Shared recompute core. The per-SKU math lives HERE only — both the 6h cron
+// route and scripts/recompute-projections.ts call computeSkuProjection so the two
+// can never drift. Reads via any Supabase client; persistProjections writes via
+// the service-role admin client (server-only).
+//
+// Demand is REAL: base_daily_demand = units_sold_30d/30, actual_7d = units_sold_7d
+// (from sku_demand, written by the daily demand-sync). renewals stays 0 until
+// ReCharge is integrated (so no double-count — CLAUDE.md decision #1 is moot).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-  computeDDR,
   computeProjection,
-  projected7d,
   DEFAULT_CONFIG,
   type ProjectionConfig,
   type ProjectionResult,
@@ -15,34 +17,25 @@ import {
 
 const num = (v: unknown): number => (v === null || v === undefined ? 0 : Number(v));
 
-export interface SkuBootstrapInput {
+export interface SkuDemandInput {
   shopify_units: number;
-  /** latest projections.daily_demand_rate — DEMO bootstrap of the run-rate. */
-  seededDDR: number;
-  /** latest projections.spike_pct — DEMO back-derivation of actual_7d. */
-  seededSpike: number;
+  /** real net units sold in the last 30 days (from sku_demand) */
+  units_sold_30d: number;
+  /** real net units sold in the last 7 days */
+  units_sold_7d: number;
   upcoming_renewals_30d: number;
   lead_time_days: number;
   safety_stock_days: number;
   today: Date;
 }
 
-/**
- * THE recompute math (single source). DEMO bootstrap: reconstruct base run-rate
- * from the seeded DDR and back-derive actual_7d from the seeded spike — REPLACE
- * with units_sold_30d/30 and real 7-day sales when order history lands. Idempotent
- * (ddr_out == ddr_in), so re-running is a fixed point.
- */
+/** THE recompute math (single source) — real demand in, ProjectionResult out. */
 export function computeSkuProjection(
-  input: SkuBootstrapInput,
+  input: SkuDemandInput,
   config: ProjectionConfig = DEFAULT_CONFIG,
 ): ProjectionResult {
-  const base_daily_demand = input.seededDDR / config.growth;
-  const ddr = computeDDR(
-    { base_daily_demand, upcoming_renewals_30d: input.upcoming_renewals_30d },
-    config,
-  );
-  const actual_7d = projected7d(ddr) * (1 + input.seededSpike / 100);
+  const base_daily_demand = Math.max(input.units_sold_30d, 0) / 30;
+  const actual_7d = Math.max(input.units_sold_7d, 0);
   return computeProjection(
     {
       base_daily_demand,
@@ -70,12 +63,12 @@ export interface RecomputeProduct {
 export interface RecomputeInputs {
   products: RecomputeProduct[];
   latestSnapUnits: Map<string, number>;
-  seededDDR: Map<string, number>;
-  seededSpike: Map<string, number>;
+  demand30: Map<string, number>;
+  demand7: Map<string, number>;
   renewals30d: Map<string, number>;
 }
 
-/** Read everything the recompute needs (latest snapshot + projection per SKU, 30d renewals). */
+/** Read everything the recompute needs: latest snapshot, real demand, 30d renewals. */
 export async function readRecomputeInputs(
   client: SupabaseClient,
   now: Date,
@@ -83,31 +76,34 @@ export async function readRecomputeInputs(
   const horizon30 = new Date(now);
   horizon30.setUTCDate(horizon30.getUTCDate() + 30);
 
-  const [products, snaps, projs, renewals] = await Promise.all([
+  const [products, snaps, demand, renewals] = await Promise.all([
     client
       .from("products")
       .select("id, name, category, lead_time_days, safety_stock_days")
       .eq("active", true)
       .order("name"),
-    client.from("inventory_snapshots").select("product_id, shopify_units, snapshot_at").order("snapshot_at", { ascending: false }),
-    client.from("projections").select("product_id, daily_demand_rate, spike_pct, calculated_at").order("calculated_at", { ascending: false }),
+    client
+      .from("inventory_snapshots")
+      .select("product_id, shopify_units, snapshot_at")
+      .order("snapshot_at", { ascending: false }),
+    client.from("sku_demand").select("product_id, units_sold_30d, units_sold_7d"),
     client.from("recharge_renewals").select("product_id, expected_units, renewal_date"),
   ]);
   if (products.error) throw new Error(`products: ${products.error.message}`);
   if (snaps.error) throw new Error(`inventory_snapshots: ${snaps.error.message}`);
-  if (projs.error) throw new Error(`projections: ${projs.error.message}`);
+  if (demand.error) throw new Error(`sku_demand: ${demand.error.message}`);
   if (renewals.error) throw new Error(`recharge_renewals: ${renewals.error.message}`);
 
   const latestSnapUnits = new Map<string, number>();
-  for (const s of snaps.data ?? []) if (!latestSnapUnits.has(s.product_id)) latestSnapUnits.set(s.product_id, num(s.shopify_units));
+  for (const s of snaps.data ?? []) {
+    if (!latestSnapUnits.has(s.product_id)) latestSnapUnits.set(s.product_id, num(s.shopify_units));
+  }
 
-  const seededDDR = new Map<string, number>();
-  const seededSpike = new Map<string, number>();
-  for (const p of projs.data ?? []) {
-    if (!seededDDR.has(p.product_id)) {
-      seededDDR.set(p.product_id, num(p.daily_demand_rate));
-      seededSpike.set(p.product_id, num(p.spike_pct));
-    }
+  const demand30 = new Map<string, number>();
+  const demand7 = new Map<string, number>();
+  for (const d of demand.data ?? []) {
+    demand30.set(d.product_id, num(d.units_sold_30d));
+    demand7.set(d.product_id, num(d.units_sold_7d));
   }
 
   const renewals30d = new Map<string, number>();
@@ -118,7 +114,13 @@ export async function readRecomputeInputs(
     }
   }
 
-  return { products: (products.data ?? []) as RecomputeProduct[], latestSnapUnits, seededDDR, seededSpike, renewals30d };
+  return {
+    products: (products.data ?? []) as RecomputeProduct[],
+    latestSnapUnits,
+    demand30,
+    demand7,
+    renewals30d,
+  };
 }
 
 export interface ComputedProjection {
@@ -126,15 +128,15 @@ export interface ComputedProjection {
   result: ProjectionResult;
 }
 
-/** Compute one projection per active SKU that has a snapshot. */
+/** Compute one projection per active SKU that has an inventory snapshot. */
 export function computeAll(inputs: RecomputeInputs, today: Date): ComputedProjection[] {
   const out: ComputedProjection[] = [];
   for (const p of inputs.products) {
     if (!inputs.latestSnapUnits.has(p.id)) continue; // no inventory snapshot → skip
     const result = computeSkuProjection({
       shopify_units: inputs.latestSnapUnits.get(p.id) ?? 0,
-      seededDDR: inputs.seededDDR.get(p.id) ?? 0,
-      seededSpike: inputs.seededSpike.get(p.id) ?? 0,
+      units_sold_30d: inputs.demand30.get(p.id) ?? 0,
+      units_sold_7d: inputs.demand7.get(p.id) ?? 0,
       upcoming_renewals_30d: inputs.renewals30d.get(p.id) ?? 0,
       lead_time_days: p.lead_time_days,
       safety_stock_days: p.safety_stock_days,
@@ -147,8 +149,7 @@ export function computeAll(inputs: RecomputeInputs, today: Date): ComputedProjec
 
 /**
  * Idempotent persist via the SERVICE-ROLE client (server-only): delete the
- * projection rows for these SKUs, then insert the fresh ones. Mirrors the CLI's
- * delete+insert. Returns the number of rows written.
+ * projection rows for these SKUs, then insert the fresh ones. Returns rows written.
  */
 export async function persistProjections(
   admin: SupabaseClient,
