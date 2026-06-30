@@ -97,8 +97,8 @@ export default async function Page({
         <ReorderQueue rows={queue} />
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
-          Lillie &amp; Lee · Phase 1 dashboard shell · reading live from Supabase
-          (demo data)
+          Lillie &amp; Lee · Shopify location on-hand · demand &amp; projections
+          estimated pending order history
         </footer>
       </main>
     </div>

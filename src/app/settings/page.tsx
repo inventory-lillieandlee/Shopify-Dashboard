@@ -93,7 +93,7 @@ export default async function SettingsPage({
         )}
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
-          Lillie &amp; Lee · Settings (read-only) · reading live from Supabase (demo data)
+          Lillie &amp; Lee · Settings (read-only) · Shopify location on-hand · demand &amp; projections estimated pending order history
         </footer>
       </main>
     </div>
