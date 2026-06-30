@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users, ShieldCheck, Eye } from "lucide-react";
+import { Users, ShieldCheck, Eye, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
 import { Select } from "@/components/ui/select";
@@ -18,7 +18,7 @@ type Load =
   | { state: "loading" }
   | { state: "forbidden" }
   | { state: "error"; message: string }
-  | { state: "ready"; users: Member[] };
+  | { state: "ready"; users: Member[]; me: string | null };
 
 type Msg = { kind: "ok" | "err"; text: string } | null;
 
@@ -30,6 +30,7 @@ export function TeamPanel() {
   const [role, setRole] = useState<Role>("viewer");
   const [msg, setMsg] = useState<Msg>(null);
   const [inviting, setInviting] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/team", { cache: "no-store" });
@@ -38,8 +39,8 @@ export function TeamPanel() {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       return setLoad({ state: "error", message: j.error || `Failed (${res.status})` });
     }
-    const json = (await res.json()) as { users: Member[] };
-    setLoad({ state: "ready", users: json.users });
+    const json = (await res.json()) as { users: Member[]; me: string | null };
+    setLoad({ state: "ready", users: json.users, me: json.me });
   }
 
   useEffect(() => {
@@ -65,6 +66,23 @@ export function TeamPanel() {
       refresh().catch(() => {});
     } else {
       setMsg({ kind: "err", text: j.error || "Could not send the invite." });
+    }
+  }
+
+  async function remove(u: Member) {
+    const pending = u.status === "pending";
+    const verb = pending ? "Cancel the invite for" : "Remove";
+    if (!window.confirm(`${verb} ${u.email ?? "this user"}? This can't be undone.`)) return;
+    setMsg(null);
+    setRemovingId(u.id);
+    const res = await fetch(`/api/team?id=${encodeURIComponent(u.id)}`, { method: "DELETE" });
+    setRemovingId(null);
+    if (res.ok) {
+      setMsg({ kind: "ok", text: `${pending ? "Invite cancelled for" : "Removed"} ${u.email ?? "user"}.` });
+      refresh().catch(() => {});
+    } else {
+      const j = (await res.json().catch(() => ({}))) as { error?: string };
+      setMsg({ kind: "err", text: j.error || "Could not remove this user." });
     }
   }
 
@@ -141,11 +159,12 @@ export function TeamPanel() {
               <th className="px-3 py-2 font-medium">Email</th>
               <th className="px-3 py-2 font-medium">Access</th>
               <th className="px-3 py-2 font-medium">Status</th>
+              <th className="px-3 py-2 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {load.users.length === 0 ? (
-              <tr><td colSpan={3} className="px-3 py-6 text-center text-muted-foreground">No members yet.</td></tr>
+              <tr><td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">No members yet.</td></tr>
             ) : (
               load.users.map((u) => (
                 <tr key={u.id} className="border-t border-border">
@@ -170,6 +189,21 @@ export function TeamPanel() {
                     >
                       {u.status === "accepted" ? "active" : "invited"}
                     </span>
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    {u.id === load.me ? (
+                      <span className="text-xs text-muted-foreground">You</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => remove(u)}
+                        disabled={removingId === u.id}
+                        className="inline-flex items-center gap-1 text-xs font-medium text-red-700 transition-colors hover:text-red-800 disabled:opacity-50"
+                      >
+                        <Trash2 className="size-3.5" />
+                        {removingId === u.id ? "…" : u.status === "pending" ? "Cancel invite" : "Remove"}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

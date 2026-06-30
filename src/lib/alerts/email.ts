@@ -5,6 +5,7 @@
 import type { InventoryRow } from "@/lib/data/types";
 import { daysUntil, type AlertReason } from "@/lib/dashboard";
 import type { AlertConfig } from "./config.ts";
+import { sendEmail } from "@/lib/email/mailer";
 
 const LEVEL_COLORS: Record<string, { band: string; chipBg: string; chipFg: string }> = {
   yellow: { band: "#f59e0b", chipBg: "#fde68a", chipFg: "#78350f" },
@@ -115,24 +116,9 @@ export interface SendArgs {
 }
 
 /**
- * SERVER-ONLY. Sends via the Resend REST API. Reads RESEND_API_KEY (server-only
- * secret — never NEXT_PUBLIC, never client). Throws on non-2xx so the caller can
- * skip the alert_log write and retry next run.
+ * SERVER-ONLY. Sends one alert via the shared Resend mailer using the configured
+ * sender. Throws on non-2xx so the caller can skip the alert_log write and retry.
  */
 export async function sendAlertEmail(cfg: AlertConfig, msg: SendArgs): Promise<{ id: string }> {
-  const key = process.env.RESEND_API_KEY; // server-only secret
-  if (!key) throw new Error("RESEND_API_KEY not set");
-  if (!cfg.from) throw new Error("ALERT_FROM_EMAIL not set");
-  if (msg.to.length === 0) throw new Error("no recipients");
-
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: cfg.from, to: msg.to, subject: msg.subject, html: msg.html }),
-  });
-  if (!res.ok) {
-    throw new Error(`Resend ${res.status}: ${await res.text()}`);
-  }
-  const data = (await res.json()) as { id?: string };
-  return { id: data.id ?? "" };
+  return sendEmail({ from: cfg.from, to: msg.to, subject: msg.subject, html: msg.html });
 }
