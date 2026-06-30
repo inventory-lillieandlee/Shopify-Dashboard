@@ -40,6 +40,7 @@ const EN_COL: Record<Tier, "yellow_enabled" | "red_enabled" | "critical_enabled"
   red: "red_enabled",
   critical: "critical_enabled",
 };
+const TIER_LABEL: Record<Tier, string> = { yellow: "Yellow ≤", red: "Red ≤", critical: "Critical ≤" };
 const numField =
   "h-9 w-20 rounded-md border bg-card px-2 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60 disabled:cursor-not-allowed";
 const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -71,6 +72,10 @@ export function SettingsEditor() {
     setData({ ...data, categories: data.categories.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const setSku = (i: number, k: "lead_time_days" | "safety_stock_days", v: number) =>
     setData({ ...data, skus: data.skus.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
+  // Tier toggles live in the column header and apply to every category at once.
+  const tierAllOn = (tier: Tier) => data.categories.every((c) => c[EN_COL[tier]]);
+  const setTierAll = (tier: Tier, value: boolean) =>
+    setData({ ...data, categories: data.categories.map((c) => ({ ...c, [EN_COL[tier]]: value })) });
 
   const dirtyGlobal = !eq(data.app, base.app);
   const dirtyTiers = !eq(data.categories, base.categories);
@@ -141,14 +146,27 @@ export function SettingsEditor() {
 
       {/* Per-category tier cutoffs + per-tier alert toggles */}
       <Shell>
-        <Head title="Alert tiers — days of stock" sub="Days of stock remaining for each tier, per category. The toggle controls whether that tier emails an alert (the dashboard still shows it).">
+        <Head title="Alert tiers — days of stock" sub="Days of stock remaining for each tier, per category. Each column's header toggle turns that tier's email alerts on or off across all categories (the dashboard still shows the tier either way).">
           {editable && dirtyTiers && <SaveBtn onClick={() => save("tiers")} busy={busy === "tiers"} />}
         </Head>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground [&>th]:px-2 [&>th]:py-2">
-                <th>Category</th><th>Yellow ≤</th><th>Red ≤</th><th>Critical ≤</th>
+              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground [&>th]:px-2 [&>th]:py-2 [&>th]:align-bottom">
+                <th>Category</th>
+                {(["yellow", "red", "critical"] as Tier[]).map((tier) => (
+                  <th key={tier}>
+                    <div className="flex items-center gap-2">
+                      <span>{TIER_LABEL[tier]}</span>
+                      <Toggle
+                        on={tierAllOn(tier)}
+                        disabled={!editable}
+                        label={`${tier} email alerts for all categories`}
+                        onChange={(v) => setTierAll(tier, v)}
+                      />
+                    </div>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -157,22 +175,14 @@ export function SettingsEditor() {
                   <td className="font-medium">{CATEGORY_LABELS[c.category] ?? c.category}</td>
                   {(["yellow", "red", "critical"] as Tier[]).map((tier) => (
                     <td key={tier}>
-                      <div className="flex items-center gap-2">
-                        <Toggle
-                          on={c[EN_COL[tier]]}
-                          disabled={!editable}
-                          label={`${tier} alerts for ${c.category}`}
-                          onChange={(v) => setCat(i, { [EN_COL[tier]]: v } as Partial<CategoryRow>)}
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          disabled={!editable}
-                          value={c[DAY_COL[tier]]}
-                          onChange={(e) => setCat(i, { [DAY_COL[tier]]: Number(e.target.value) } as Partial<CategoryRow>)}
-                          className={cn(numField, !c[EN_COL[tier]] && "opacity-60")}
-                        />
-                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        disabled={!editable}
+                        value={c[DAY_COL[tier]]}
+                        onChange={(e) => setCat(i, { [DAY_COL[tier]]: Number(e.target.value) } as Partial<CategoryRow>)}
+                        className={cn(numField, !tierAllOn(tier) && "opacity-60")}
+                      />
                     </td>
                   ))}
                 </tr>
@@ -180,7 +190,7 @@ export function SettingsEditor() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted-foreground">Must stay ordered: yellow ≥ red ≥ critical. A muted tier (toggle off) still shows on the dashboard — it just won't email.</p>
+        <p className="text-xs text-muted-foreground">Must stay ordered: yellow ≥ red ≥ critical. A muted tier (header toggle off) still shows on the dashboard — it just won't email.</p>
       </Shell>
 
       {/* Per-SKU lead time + safety stock */}
