@@ -52,4 +52,11 @@ create policy "authenticated read recharge_renewals"
   to authenticated
   using (true);
 
--- service_role "full access" policies from 20260624155250 are unchanged and remain.
+-- sku_demand (Phase D) — drop the demo anon read. The cron reads it via service-role;
+-- the dashboard does not read it directly, so no authenticated policy is needed.
+drop policy if exists "anon read sku_demand (DEMO ONLY)" on public.sku_demand;
+
+-- alert_recipients (Phase D) is already service_role-only (no anon policy) — nothing
+-- to change; recipient emails stay private and are managed via the admin API.
+
+-- service_role "full access" policies (incl. sku_demand + alert_recipients) are unchanged.
