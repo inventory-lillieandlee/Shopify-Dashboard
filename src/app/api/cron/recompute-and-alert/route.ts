@@ -61,7 +61,16 @@ export async function GET(req: Request) {
       alertLogByProduct.set(r.product_id, list);
     }
 
-    const dispatch = await runDispatch({ rows, config, recipients, alertLogByProduct, now, dryRun, admin });
+    const dispatch = await runDispatch({
+      rows,
+      config,
+      recipients,
+      alertLogByProduct,
+      alertEnabledByCategory: settings.alertEnabledByCategory,
+      now,
+      dryRun,
+      admin,
+    });
 
     return Response.json({
       ok: true,

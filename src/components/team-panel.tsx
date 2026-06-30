@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Users } from "lucide-react";
+import { Users, ShieldCheck, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
+import { Select } from "@/components/ui/select";
 
+type Role = "admin" | "viewer";
 interface Member {
   id: string;
   email: string | null;
@@ -18,10 +20,15 @@ type Load =
   | { state: "error"; message: string }
   | { state: "ready"; users: Member[] };
 
+type Msg = { kind: "ok" | "err"; text: string } | null;
+
+const isAdminRole = (r: string) => r === "admin";
+
 export function TeamPanel() {
   const [load, setLoad] = useState<Load>({ state: "loading" });
   const [email, setEmail] = useState("");
-  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+  const [role, setRole] = useState<Role>("viewer");
+  const [msg, setMsg] = useState<Msg>(null);
   const [inviting, setInviting] = useState(false);
 
   async function refresh() {
@@ -41,21 +48,23 @@ export function TeamPanel() {
 
   async function invite(e: React.FormEvent) {
     e.preventDefault();
-    setInviteMsg(null);
+    setMsg(null);
     setInviting(true);
     const res = await fetch("/api/team/invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, role }),
     });
     setInviting(false);
+    const j = (await res.json().catch(() => ({}))) as { error?: string; warning?: string };
     if (res.ok) {
-      setInviteMsg(`Invited ${email}.`);
+      const label = role === "admin" ? "an admin" : "a viewer";
+      setMsg({ kind: "ok", text: j.warning ?? `Invited ${email} as ${label} — they'll get an email to set a password.` });
       setEmail("");
+      setRole("viewer");
       refresh().catch(() => {});
     } else {
-      const j = (await res.json().catch(() => ({}))) as { error?: string };
-      setInviteMsg(j.error ? `Could not invite: ${j.error}` : "Could not invite.");
+      setMsg({ kind: "err", text: j.error || "Could not send the invite." });
     }
   }
 
@@ -71,8 +80,7 @@ export function TeamPanel() {
         </span>
         <h2 className="font-display text-lg font-semibold text-brand">Admin sign-in required</h2>
         <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          Team management is admin-only. While auth is dormant no one is signed in, so this is
-          inert by design — it activates after the first admin is created at go-live.
+          Team management is admin-only. Sign in with an admin account to invite teammates and manage roles.
         </p>
       </Shell>
     );
@@ -89,32 +97,49 @@ export function TeamPanel() {
         <h2 className="font-display text-lg font-semibold text-brand">Team</h2>
         <span className="text-sm text-muted-foreground">{load.users.length} members</span>
       </div>
+      <p className="text-sm text-muted-foreground">
+        Invite teammates by email and choose their access. <strong className="font-medium text-foreground">Admins</strong> can
+        edit settings, alerts, and the team; <strong className="font-medium text-foreground">viewers</strong> can see the
+        dashboard only.
+      </p>
 
-      <form onSubmit={invite} className="flex flex-wrap items-center gap-2">
-        <input
-          type="email"
-          required
-          placeholder="invite by email…"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="h-9 min-w-56 flex-1 rounded-md border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-        />
+      <form onSubmit={invite} className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-56 flex-1 flex-col gap-1 text-xs text-muted-foreground">
+          Email
+          <input
+            type="email"
+            required
+            placeholder="teammate@lillieandlee.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-9 rounded-md border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+          Access
+          <Select value={role} onChange={(e) => setRole(e.target.value as Role)} containerClassName="w-40">
+            <option value="viewer">Viewer (view only)</option>
+            <option value="admin">Admin (full access)</option>
+          </Select>
+        </label>
         <button
           type="submit"
           disabled={inviting}
-          className="h-9 rounded-md bg-brand px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          className="h-9 rounded-md bg-brand px-3.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
         >
-          {inviting ? "…" : "Send invite"}
+          {inviting ? "Sending…" : "Send invite"}
         </button>
       </form>
-      {inviteMsg ? <p className="text-sm text-muted-foreground">{inviteMsg}</p> : null}
+      {msg ? (
+        <p className={cn("text-sm", msg.kind === "ok" ? "text-emerald-700" : "text-red-700")}>{msg.text}</p>
+      ) : null}
 
       <div className="overflow-hidden rounded-xl border border-border">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-3 py-2 font-medium">Email</th>
-              <th className="px-3 py-2 font-medium">Role</th>
+              <th className="px-3 py-2 font-medium">Access</th>
               <th className="px-3 py-2 font-medium">Status</th>
             </tr>
           </thead>
@@ -125,7 +150,17 @@ export function TeamPanel() {
               load.users.map((u) => (
                 <tr key={u.id} className="border-t border-border">
                   <td className="px-3 py-2">{u.email ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground">{u.role}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+                        isAdminRole(u.role) ? "bg-brand/10 text-brand" : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {isAdminRole(u.role) ? <ShieldCheck className="size-3" /> : <Eye className="size-3" />}
+                      {isAdminRole(u.role) ? "Admin" : "Viewer"}
+                    </span>
+                  </td>
                   <td className="px-3 py-2">
                     <span
                       className={cn(
@@ -133,7 +168,7 @@ export function TeamPanel() {
                         u.status === "accepted" ? "bg-[#d1fae5] text-[#065f46]" : "bg-[#fde68a] text-[#78350f]",
                       )}
                     >
-                      {u.status}
+                      {u.status === "accepted" ? "active" : "invited"}
                     </span>
                   </td>
                 </tr>

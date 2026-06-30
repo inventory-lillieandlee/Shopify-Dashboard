@@ -4,6 +4,7 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { ArrowDownNarrowWide, ArrowUpNarrowWide, X } from "lucide-react";
 import { CATEGORIES, type AlertLevel } from "@/lib/data/types";
 import { ALERT_LABELS, CATEGORY_LABELS, type SortKey } from "@/lib/dashboard";
+import { Select } from "@/components/ui/select";
 
 const ALERT_OPTIONS: AlertLevel[] = ["critical", "red", "yellow", "ok"];
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -11,9 +12,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "units", label: "Current units" },
   { key: "name", label: "Product" },
 ];
-
-const selectClass =
-  "h-9 rounded-md border bg-card px-2.5 text-sm shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
 
 export function TableControls({
   category,
@@ -46,49 +44,37 @@ export function TableControls({
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
         Category
-        <select
-          className={selectClass}
-          value={category ?? "all"}
-          onChange={(e) => update({ category: e.target.value })}
-        >
+        <Select value={category ?? "all"} onChange={(e) => update({ category: e.target.value })}>
           <option value="all">All</option>
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
               {CATEGORY_LABELS[c]}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
         Alert
-        <select
-          className={selectClass}
-          value={alert ?? "all"}
-          onChange={(e) => update({ alert: e.target.value })}
-        >
+        <Select value={alert ?? "all"} onChange={(e) => update({ alert: e.target.value })}>
           <option value="all">All</option>
           {ALERT_OPTIONS.map((a) => (
             <option key={a} value={a}>
               {ALERT_LABELS[a]}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <label className="flex items-center gap-1.5 text-sm text-muted-foreground">
         Sort
-        <select
-          className={selectClass}
-          value={sort}
-          onChange={(e) => update({ sort: e.target.value })}
-        >
+        <Select value={sort} onChange={(e) => update({ sort: e.target.value })}>
           {SORT_OPTIONS.map((s) => (
             <option key={s.key} value={s.key}>
               {s.label}
             </option>
           ))}
-        </select>
+        </Select>
       </label>
 
       <button

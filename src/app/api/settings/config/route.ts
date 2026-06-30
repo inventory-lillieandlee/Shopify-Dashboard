@@ -22,7 +22,10 @@ export async function GET() {
     const user = await getSessionUser();
     const [app, cats, prods] = await Promise.all([
       supabase.from("app_config").select("growth_pct, spike_threshold_pct").maybeSingle(),
-      supabase.from("category_thresholds").select("category, yellow_days, red_days, critical_days").order("category"),
+      supabase
+        .from("category_thresholds")
+        .select("category, yellow_days, red_days, critical_days, yellow_enabled, red_enabled, critical_enabled")
+        .order("category"),
       supabase
         .from("products")
         .select("id, name, category, lead_time_days, safety_stock_days")
@@ -56,7 +59,15 @@ export async function PATCH(req: NextRequest) {
   const b = body as {
     growth_pct?: unknown;
     spike_threshold_pct?: unknown;
-    categories?: { category: string; yellow_days: number; red_days: number; critical_days: number }[];
+    categories?: {
+      category: string;
+      yellow_days: number;
+      red_days: number;
+      critical_days: number;
+      yellow_enabled?: boolean;
+      red_enabled?: boolean;
+      critical_enabled?: boolean;
+    }[];
     skus?: { id: string; lead_time_days: number; safety_stock_days: number }[];
   };
 
@@ -83,9 +94,17 @@ export async function PATCH(req: NextRequest) {
         return Response.json({ error: "threshold days must be whole numbers" }, { status: 400 });
       if (!(c.yellow_days >= c.red_days && c.red_days >= c.critical_days))
         return Response.json({ error: "must be yellow ≥ red ≥ critical" }, { status: 400 });
+      const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
       const { error: e } = await admin
         .from("category_thresholds")
-        .update({ yellow_days: c.yellow_days, red_days: c.red_days, critical_days: c.critical_days })
+        .update({
+          yellow_days: c.yellow_days,
+          red_days: c.red_days,
+          critical_days: c.critical_days,
+          yellow_enabled: bool(c.yellow_enabled, true),
+          red_enabled: bool(c.red_enabled, true),
+          critical_enabled: bool(c.critical_enabled, true),
+        })
         .eq("category", c.category);
       if (e) throw new Error(e.message);
     }

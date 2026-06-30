@@ -9,13 +9,14 @@ import { isWritableAlertLevel, recipientsForLevel, type RecipientLike } from "./
 import { decideDispatch, type PriorFire, type DispatchReason } from "./dedup.ts";
 import { renderAlertEmail, sendAlertEmail } from "./email.ts";
 import type { AlertConfig } from "./config.ts";
+import type { TierEnabled } from "@/lib/config/projection-config";
 
 export interface DispatchResultRow {
   productId: string;
   sku: string;
   level: string;
   action: "would-send" | "sent" | "skipped" | "error";
-  reason: DispatchReason | "no-recipients" | "guard-blocked" | "send-failed";
+  reason: DispatchReason | "no-recipients" | "guard-blocked" | "send-failed" | "muted";
   subject?: string;
   recipients?: string[];
   logged?: boolean;
@@ -37,6 +38,8 @@ export interface RunDispatchOptions {
   /** Active recipients (email + min_level) from alert_recipients. */
   recipients: RecipientLike[];
   alertLogByProduct: Map<string, PriorFire[]>;
+  /** category → which tiers email; muted (category, tier) combos are suppressed. */
+  alertEnabledByCategory: Map<string, TierEnabled>;
   now: Date;
   dryRun: boolean;
   /** Service-role client for the alert_log insert. Null in dry-run. */
@@ -44,7 +47,7 @@ export interface RunDispatchOptions {
 }
 
 export async function runDispatch(opts: RunDispatchOptions): Promise<DispatchReport> {
-  const { rows, config, recipients, alertLogByProduct, now, dryRun, admin } = opts;
+  const { rows, config, recipients, alertLogByProduct, alertEnabledByCategory, now, dryRun, admin } = opts;
   const results: DispatchResultRow[] = [];
 
   // Every alerting SKU is a candidate; routing decides who (if anyone) gets it.
@@ -53,6 +56,14 @@ export async function runDispatch(opts: RunDispatchOptions): Promise<DispatchRep
   for (const row of candidates) {
     const level = row.alertLevel as string;
     const base = { productId: row.productId, sku: row.name, level };
+
+    // Per-(category, tier) mute: dashboard still shows the tier, but no email fires.
+    const tierEnabled = alertEnabledByCategory.get(row.category)?.[level as keyof TierEnabled] ?? true;
+    if (!tierEnabled) {
+      results.push({ ...base, action: "skipped", reason: "muted" });
+      continue;
+    }
+
     const to = recipientsForLevel(recipients, level);
     const decision = decideDispatch(now, level, alertLogByProduct.get(row.productId) ?? []);
 

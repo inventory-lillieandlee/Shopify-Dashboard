@@ -6,11 +6,15 @@ import { surfacePanel } from "@/lib/surface";
 import { CATEGORY_LABELS } from "@/lib/dashboard";
 import type { Category } from "@/lib/data/types";
 
+type Tier = "yellow" | "red" | "critical";
 interface CategoryRow {
   category: Category;
   yellow_days: number;
   red_days: number;
   critical_days: number;
+  yellow_enabled: boolean;
+  red_enabled: boolean;
+  critical_enabled: boolean;
 }
 interface SkuRow {
   id: string;
@@ -26,51 +30,82 @@ interface ConfigPayload {
   skus: SkuRow[];
 }
 
+const DAY_COL: Record<Tier, "yellow_days" | "red_days" | "critical_days"> = {
+  yellow: "yellow_days",
+  red: "red_days",
+  critical: "critical_days",
+};
+const EN_COL: Record<Tier, "yellow_enabled" | "red_enabled" | "critical_enabled"> = {
+  yellow: "yellow_enabled",
+  red: "red_enabled",
+  critical: "critical_enabled",
+};
 const numField =
-  "h-9 w-24 rounded-md border bg-card px-2 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60 disabled:cursor-not-allowed";
+  "h-9 w-20 rounded-md border bg-card px-2 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:opacity-60 disabled:cursor-not-allowed";
+const eq = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
 export function SettingsEditor() {
   const [data, setData] = useState<ConfigPayload | null>(null);
+  const [base, setBase] = useState<ConfigPayload | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [done, setDone] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/settings/config", { cache: "no-store" })
-      .then(async (r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
-      .then(setData)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`Failed (${r.status})`))))
+      .then((d: ConfigPayload) => {
+        setData(d);
+        setBase(structuredClone(d));
+      })
       .catch((e) => setErr(String(e.message ?? e)));
   }, []);
 
   if (err) return <Shell><p className="text-sm text-red-700">{err}</p></Shell>;
-  if (!data) return <Shell><p className="text-sm text-muted-foreground">Loading settings…</p></Shell>;
+  if (!data || !base) return <Shell><p className="text-sm text-muted-foreground">Loading settings…</p></Shell>;
 
   const { editable } = data;
   const setApp = (k: "growth_pct" | "spike_threshold_pct", v: number) =>
     setData({ ...data, app: { ...data.app, [k]: v } });
-  const setCat = (i: number, k: keyof CategoryRow, v: number) =>
-    setData({ ...data, categories: data.categories.map((c, j) => (j === i ? { ...c, [k]: v } : c)) });
+  const setCat = (i: number, patch: Partial<CategoryRow>) =>
+    setData({ ...data, categories: data.categories.map((c, j) => (j === i ? { ...c, ...patch } : c)) });
   const setSku = (i: number, k: "lead_time_days" | "safety_stock_days", v: number) =>
     setData({ ...data, skus: data.skus.map((s, j) => (j === i ? { ...s, [k]: v } : s)) });
 
-  async function save() {
-    setSaving(true);
-    setMsg(null);
+  const dirtyGlobal = !eq(data.app, base.app);
+  const dirtyTiers = !eq(data.categories, base.categories);
+  const dirtySkus = !eq(data.skus, base.skus);
+
+  async function save(section: "global" | "tiers" | "skus") {
+    setBusy(section);
+    setDone(null);
     setErr(null);
+    const payload =
+      section === "global"
+        ? { growth_pct: data!.app.growth_pct, spike_threshold_pct: data!.app.spike_threshold_pct }
+        : section === "tiers"
+          ? { categories: data!.categories }
+          : { skus: data!.skus.map((s) => ({ id: s.id, lead_time_days: s.lead_time_days, safety_stock_days: s.safety_stock_days })) };
     const res = await fetch("/api/settings/config", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        growth_pct: data!.app.growth_pct,
-        spike_threshold_pct: data!.app.spike_threshold_pct,
-        categories: data!.categories,
-        skus: data!.skus.map((s) => ({ id: s.id, lead_time_days: s.lead_time_days, safety_stock_days: s.safety_stock_days })),
-      }),
+      body: JSON.stringify(payload),
     });
-    setSaving(false);
+    setBusy(null);
     if (res.ok) {
       const j = (await res.json()) as { recomputed?: number };
-      setMsg(`Saved — recomputed ${j.recomputed ?? 0} SKUs. Dashboard updated.`);
+      // clear this section's dirty by snapshotting it into the baseline
+      setBase((prev) =>
+        prev
+          ? {
+              ...prev,
+              app: section === "global" ? structuredClone(data!.app) : prev.app,
+              categories: section === "tiers" ? structuredClone(data!.categories) : prev.categories,
+              skus: section === "skus" ? structuredClone(data!.skus) : prev.skus,
+            }
+          : prev,
+      );
+      setDone(`${section} saved — recomputed ${j.recomputed ?? 0} SKUs.`);
     } else {
       const j = (await res.json().catch(() => ({}))) as { error?: string };
       setErr(j.error ? `Save failed: ${j.error}` : "Save failed.");
@@ -84,10 +119,14 @@ export function SettingsEditor() {
           Read-only — sign in as an admin to edit these settings.
         </p>
       )}
+      {done && <p className="text-sm text-emerald-700">{done}</p>}
+      {err && <p className="text-sm text-red-700">{err}</p>}
 
       {/* Global */}
       <Shell>
-        <Head title="Global projection settings" sub="Applied across every SKU." />
+        <Head title="Global projection settings" sub="Applied across every SKU.">
+          {editable && dirtyGlobal && <SaveBtn onClick={() => save("global")} busy={busy === "global"} />}
+        </Head>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Baseline growth" hint="% month-over-month uplift on demand">
             <input type="number" step="0.5" min={0} max={100} disabled={!editable} value={data.app.growth_pct}
@@ -100,11 +139,13 @@ export function SettingsEditor() {
         </div>
       </Shell>
 
-      {/* Per-category tier cutoffs */}
+      {/* Per-category tier cutoffs + per-tier alert toggles */}
       <Shell>
-        <Head title="Alert tiers — days of stock" sub="How many days of stock remaining moves a SKU into each tier, per category." />
+        <Head title="Alert tiers — days of stock" sub="Days of stock remaining for each tier, per category. The toggle controls whether that tier emails an alert (the dashboard still shows it).">
+          {editable && dirtyTiers && <SaveBtn onClick={() => save("tiers")} busy={busy === "tiers"} />}
+        </Head>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[34rem] text-sm">
+          <table className="w-full min-w-[40rem] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground [&>th]:px-2 [&>th]:py-2">
                 <th>Category</th><th>Yellow ≤</th><th>Red ≤</th><th>Critical ≤</th>
@@ -114,10 +155,24 @@ export function SettingsEditor() {
               {data.categories.map((c, i) => (
                 <tr key={c.category} className="border-t border-border [&>td]:px-2 [&>td]:py-2">
                   <td className="font-medium">{CATEGORY_LABELS[c.category] ?? c.category}</td>
-                  {(["yellow_days", "red_days", "critical_days"] as const).map((k) => (
-                    <td key={k}>
-                      <input type="number" min={0} disabled={!editable} value={c[k]}
-                        onChange={(e) => setCat(i, k, Number(e.target.value))} className={numField} />
+                  {(["yellow", "red", "critical"] as Tier[]).map((tier) => (
+                    <td key={tier}>
+                      <div className="flex items-center gap-2">
+                        <Toggle
+                          on={c[EN_COL[tier]]}
+                          disabled={!editable}
+                          label={`${tier} alerts for ${c.category}`}
+                          onChange={(v) => setCat(i, { [EN_COL[tier]]: v } as Partial<CategoryRow>)}
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          disabled={!editable}
+                          value={c[DAY_COL[tier]]}
+                          onChange={(e) => setCat(i, { [DAY_COL[tier]]: Number(e.target.value) } as Partial<CategoryRow>)}
+                          className={cn(numField, !c[EN_COL[tier]] && "opacity-60")}
+                        />
+                      </div>
                     </td>
                   ))}
                 </tr>
@@ -125,12 +180,14 @@ export function SettingsEditor() {
             </tbody>
           </table>
         </div>
-        <p className="text-xs text-muted-foreground">Must stay ordered: yellow ≥ red ≥ critical.</p>
+        <p className="text-xs text-muted-foreground">Must stay ordered: yellow ≥ red ≥ critical. A muted tier (toggle off) still shows on the dashboard — it just won't email.</p>
       </Shell>
 
       {/* Per-SKU lead time + safety stock */}
       <Shell>
-        <Head title="Per-SKU lead time & safety stock" sub="Drives each SKU's reorder date." />
+        <Head title="Per-SKU lead time & safety stock" sub="Drives each SKU's reorder date.">
+          {editable && dirtySkus && <SaveBtn onClick={() => save("skus")} busy={busy === "skus"} />}
+        </Head>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
             <thead>
@@ -153,17 +210,6 @@ export function SettingsEditor() {
           </table>
         </div>
       </Shell>
-
-      {editable && (
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={save} disabled={saving}
-            className="h-10 rounded-md bg-brand px-4 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50">
-            {saving ? "Saving…" : "Save & recompute"}
-          </button>
-          {msg ? <span className="text-sm text-emerald-700">{msg}</span> : null}
-          {err ? <span className="text-sm text-red-700">{err}</span> : null}
-        </div>
-      )}
     </div>
   );
 }
@@ -171,12 +217,23 @@ export function SettingsEditor() {
 function Shell({ children }: { children: React.ReactNode }) {
   return <section className={cn(surfacePanel, "space-y-4 p-5")}>{children}</section>;
 }
-function Head({ title, sub }: { title: string; sub: string }) {
+function Head({ title, sub, children }: { title: string; sub: string; children?: React.ReactNode }) {
   return (
-    <div>
-      <h2 className="font-display text-lg font-semibold text-brand">{title}</h2>
-      <p className="text-sm text-muted-foreground">{sub}</p>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 className="font-display text-lg font-semibold text-brand">{title}</h2>
+        <p className="max-w-2xl text-sm text-muted-foreground">{sub}</p>
+      </div>
+      {children}
     </div>
+  );
+}
+function SaveBtn({ onClick, busy }: { onClick: () => void; busy: boolean }) {
+  return (
+    <button type="button" onClick={onClick} disabled={busy}
+      className="h-9 shrink-0 rounded-md bg-brand px-3.5 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50">
+      {busy ? "Saving…" : "Save & recompute"}
+    </button>
   );
 }
 function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
@@ -186,5 +243,17 @@ function Field({ label, hint, children }: { label: string; hint: string; childre
       <div className="mt-1 flex items-center gap-1">{children}</div>
       <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
     </div>
+  );
+}
+function Toggle({ on, disabled, onChange, label }: { on: boolean; disabled: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled}
+      onClick={() => onChange(!on)}
+      className={cn(
+        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-50",
+        on ? "bg-brand" : "bg-muted-foreground/30",
+      )}>
+      <span className={cn("inline-block size-4 rounded-full bg-white shadow transition-transform", on ? "translate-x-4" : "translate-x-0.5")} />
+    </button>
   );
 }

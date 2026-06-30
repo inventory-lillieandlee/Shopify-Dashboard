@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BellRing } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
+import { Select } from "@/components/ui/select";
 
 interface Recipient {
   id: string;
@@ -107,15 +108,15 @@ export function AlertRecipientsPanel() {
           onChange={(e) => setEmail(e.target.value)}
           className="h-9 min-w-56 flex-1 rounded-md border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
         />
-        <select
+        <Select
           value={minLevel}
           onChange={(e) => setMinLevel(e.target.value as typeof minLevel)}
-          className="h-9 rounded-md border bg-card px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+          containerClassName="w-40"
         >
           <option value="yellow">Yellow+ (all)</option>
-          <option value="red">Red+ </option>
+          <option value="red">Red+</option>
           <option value="critical">Critical only</option>
-        </select>
+        </Select>
         <button
           type="submit"
           disabled={busy}
