@@ -5,6 +5,7 @@ import { Users, ShieldCheck, Eye, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
 import { Select } from "@/components/ui/select";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 type Role = "admin" | "viewer";
 interface Member {
@@ -31,6 +32,7 @@ export function TeamPanel() {
   const [msg, setMsg] = useState<Msg>(null);
   const [inviting, setInviting] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [confirmUser, setConfirmUser] = useState<Member | null>(null);
 
   async function refresh() {
     const res = await fetch("/api/team", { cache: "no-store" });
@@ -69,14 +71,15 @@ export function TeamPanel() {
     }
   }
 
-  async function remove(u: Member) {
+  async function doRemove() {
+    const u = confirmUser;
+    if (!u) return;
     const pending = u.status === "pending";
-    const verb = pending ? "Cancel the invite for" : "Remove";
-    if (!window.confirm(`${verb} ${u.email ?? "this user"}? This can't be undone.`)) return;
     setMsg(null);
     setRemovingId(u.id);
     const res = await fetch(`/api/team?id=${encodeURIComponent(u.id)}`, { method: "DELETE" });
     setRemovingId(null);
+    setConfirmUser(null);
     if (res.ok) {
       setMsg({ kind: "ok", text: `${pending ? "Invite cancelled for" : "Removed"} ${u.email ?? "user"}.` });
       refresh().catch(() => {});
@@ -196,7 +199,7 @@ export function TeamPanel() {
                     ) : (
                       <button
                         type="button"
-                        onClick={() => remove(u)}
+                        onClick={() => { setMsg(null); setConfirmUser(u); }}
                         disabled={removingId === u.id}
                         className="inline-flex items-center gap-1 text-xs font-medium text-red-700 transition-colors hover:text-red-800 disabled:opacity-50"
                       >
@@ -211,6 +214,22 @@ export function TeamPanel() {
           </tbody>
         </table>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmUser}
+        title={confirmUser?.status === "pending" ? "Cancel invite?" : "Remove member?"}
+        message={
+          confirmUser?.status === "pending"
+            ? `This cancels the invite for ${confirmUser?.email ?? "this user"} and invalidates their link.`
+            : `This removes ${confirmUser?.email ?? "this user"}'s access. They'll need a new invite to return.`
+        }
+        confirmLabel={confirmUser?.status === "pending" ? "Cancel invite" : "Remove"}
+        cancelLabel="Keep"
+        destructive
+        busy={Boolean(removingId)}
+        onConfirm={doRemove}
+        onCancel={() => setConfirmUser(null)}
+      />
     </Shell>
   );
 }
