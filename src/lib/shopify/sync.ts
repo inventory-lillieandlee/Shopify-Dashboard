@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchOrdersSince } from "./orders";
 import { computeDemand } from "./demand";
-import { fetchOnHand } from "./inventory";
+import { fetchInventoryLevels } from "./inventory";
 
 /**
  * Daily demand sync: pull the last 30 days of orders, compute net units sold per
@@ -44,9 +44,11 @@ export async function syncDemand(
 }
 
 /**
- * Cheap inventory refresh (one GraphQL call): fresh on_hand per SKU at the Shop
- * location → a new inventory_snapshots row (clamped at 0, raw preserved). Runs on
- * the 6h cron before recompute.
+ * Cheap inventory refresh (one GraphQL call): fresh `available` per SKU at the Shop
+ * location → a new inventory_snapshots row. `available` (sellable, = the admin's
+ * default column) is the displayed number; on_hand + committed are stored for
+ * reference. NOT clamped — negatives (oversold) are stored as-is so the dashboard
+ * matches the admin. Runs on the 6h cron before recompute.
  */
 export async function refreshInventory(
   admin: SupabaseClient,
@@ -60,14 +62,19 @@ export async function refreshInventory(
   const products = (data ?? []) as { id: string; inventory_item_id: number | null }[];
 
   const withIii = products.filter((p) => p.inventory_item_id != null);
-  const onHand = await fetchOnHand(withIii.map((p) => Number(p.inventory_item_id)));
+  const levels = await fetchInventoryLevels(withIii.map((p) => Number(p.inventory_item_id)));
 
   const rows = withIii.map((p) => {
-    const raw = onHand.get(String(p.inventory_item_id)) ?? null;
+    const lv = levels.get(String(p.inventory_item_id));
+    const available = lv?.available ?? null;
     return {
       product_id: p.id,
-      shopify_units: Math.max(raw ?? 0, 0),
-      shopify_units_raw: raw,
+      // Displayed "current units" = available, unclamped. NOT NULL column, so a
+      // Shopify-absent item defaults to 0; shopify_units_raw preserves the true value.
+      shopify_units: available ?? 0,
+      shopify_units_raw: available,
+      shopify_on_hand: lv?.onHand ?? null,
+      shopify_committed: lv?.committed ?? null,
       tpl_units: 0,
       source: "shopify",
       snapshot_at: now.toISOString(),
