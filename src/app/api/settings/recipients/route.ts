@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { requireAdmin } from "@/lib/auth/require-admin";
+import { adminClientOrError } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,10 +7,9 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LEVELS = new Set(["yellow", "red", "critical"]);
 
-// Manage alert recipients. ADMIN-ONLY (403/500 via requireAdmin). Service-role only
-// (emails are private).
+// Manage alert recipients via the service-role client. Open — no login/admin gate.
 export async function GET() {
-  const { admin, error } = await requireAdmin();
+  const { admin, error } = adminClientOrError();
   if (error) return error;
   try {
     const { data, error: e } = await admin
@@ -26,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const { admin, error } = await requireAdmin();
+  const { admin, error } = adminClientOrError();
   if (error) return error;
   let body: unknown;
   try {
@@ -55,7 +54,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const { admin, error } = await requireAdmin();
+  const { admin, error } = adminClientOrError();
   if (error) return error;
   const id = new URL(req.url).searchParams.get("id");
   if (!id) return Response.json({ error: "id required" }, { status: 400 });

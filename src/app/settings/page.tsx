@@ -3,7 +3,6 @@ import { ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/site-header";
 import { SettingsEditor } from "@/components/settings-editor";
-import { TeamPanel } from "@/components/team-panel";
 import { AlertRecipientsPanel } from "@/components/alert-recipients-panel";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +40,7 @@ export default async function SettingsPage({
 }) {
   const sp = await searchParams;
   const raw = typeof sp.tab === "string" ? sp.tab : "settings";
-  const tab = raw === "team" || raw === "alerts" ? raw : "settings";
+  const tab = raw === "alerts" ? "alerts" : "settings";
 
   return (
     <div className="min-h-screen">
@@ -52,9 +51,6 @@ export default async function SettingsPage({
           <nav className="flex gap-1">
             <TabLink href="/settings?tab=settings" active={tab === "settings"}>
               Settings
-            </TabLink>
-            <TabLink href="/settings?tab=team" active={tab === "team"}>
-              Team
             </TabLink>
             <TabLink href="/settings?tab=alerts" active={tab === "alerts"}>
               Alerts
@@ -68,7 +64,7 @@ export default async function SettingsPage({
           </Link>
         </div>
 
-        {tab === "settings" ? <SettingsEditor /> : tab === "team" ? <TeamPanel /> : <AlertRecipientsPanel />}
+        {tab === "settings" ? <SettingsEditor /> : <AlertRecipientsPanel />}
 
         <footer className="pt-2 text-center text-xs text-muted-foreground">
           Lillie &amp; Lee · Settings · Shopify location on-hand · excludes 3PL warehouse

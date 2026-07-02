@@ -21,13 +21,9 @@ export function createSupabaseServerClient() {
 }
 
 /**
- * Cookie/session-aware server client (@supabase/ssr) using the ANON key.
- *
- * BACKWARD-COMPATIBLE: with no session cookie it behaves exactly as the anon
- * client (anon RLS) — so the public dashboard renders identically in dormant
- * mode. When auth is live, it carries the signed-in user's session so reads run
- * under that identity (the future authenticated-RLS). This is the client
- * getInventoryRows() uses; its contract is unchanged.
+ * Anon server client (@supabase/ssr) using the ANON key. The app is open (no login),
+ * so there's no session — this reads under the anon role (anon RLS). Kept as the
+ * client getInventoryRows() uses; its contract is unchanged.
  */
 export async function createServerComponentClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -50,7 +46,6 @@ export async function createServerComponentClient() {
           }
         } catch {
           // Called from a Server Component, where cookies are read-only — no-op.
-          // The middleware refreshes the session cookie on each request.
         }
       },
     },

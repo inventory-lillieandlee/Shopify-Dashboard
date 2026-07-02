@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
-import { requireAdmin, getSessionUser } from "@/lib/auth/require-admin";
-import { isAdmin } from "@/lib/auth/policy";
 import { createServerComponentClient } from "@/lib/supabase/server";
+import { adminClientOrError } from "@/lib/supabase/admin";
 import { readRecomputeInputs, computeAll, persistProjections } from "@/lib/projections/recompute";
 import { loadProjectionSettings } from "@/lib/config/projection-config";
 
@@ -14,12 +13,10 @@ const numIn = (v: unknown, lo: number, hi: number): v is number =>
 const intIn = (v: unknown, lo: number, hi: number): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= lo && v <= hi;
 
-// GET is public (config isn't secret; these tables are anon/authenticated-readable).
-// `editable` tells the UI whether to show inputs as editable (admin) or read-only.
+// GET is public (config isn't secret). `editable: true` — the app is open (no login).
 export async function GET() {
   try {
     const supabase = await createServerComponentClient();
-    const user = await getSessionUser();
     const [app, cats, prods] = await Promise.all([
       supabase.from("app_config").select("growth_pct, spike_threshold_pct").maybeSingle(),
       supabase
@@ -33,7 +30,7 @@ export async function GET() {
         .order("name"),
     ]);
     return Response.json({
-      editable: isAdmin(user),
+      editable: true,
       app: app.data ?? { growth_pct: 8, spike_threshold_pct: 15 },
       categories: cats.data ?? [],
       skus: prods.data ?? [],
@@ -44,10 +41,10 @@ export async function GET() {
   }
 }
 
-// PATCH is ADMIN-ONLY. Validates, writes, then recomputes so the dashboard reflects
-// the new knobs immediately.
+// PATCH writes via the service-role client (bypasses RLS). Open — no login/admin gate.
+// Validates, writes, then recomputes so the dashboard reflects the new knobs at once.
 export async function PATCH(req: NextRequest) {
-  const { admin, error } = await requireAdmin();
+  const { admin, error } = adminClientOrError();
   if (error) return error;
 
   let body: unknown;
