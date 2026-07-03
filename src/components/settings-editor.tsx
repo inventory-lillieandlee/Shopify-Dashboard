@@ -132,7 +132,7 @@ export function SettingsEditor() {
         <Head title="Global projection settings" sub="Applied across every SKU.">
           {editable && dirtyGlobal && <SaveBtn onClick={() => save("global")} busy={busy === "global"} />}
         </Head>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Baseline growth" hint="% month-over-month uplift on demand">
             <input type="number" step="0.5" min={0} max={100} disabled={!editable} value={data.app.growth_pct}
               onChange={(e) => setApp("growth_pct", Number(e.target.value))} className={numField} /> <span className="text-sm text-muted-foreground">%</span>

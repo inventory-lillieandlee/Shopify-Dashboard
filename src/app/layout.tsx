@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 
@@ -22,6 +22,12 @@ export const metadata: Metadata = {
   title: "Lillie & Lee — Inventory",
   description:
     "Real-time inventory & reorder dashboard — The Pet Family Company",
+};
+
+// Correct scaling on phones for the responsive layouts.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

@@ -49,7 +49,7 @@ export function SkuDetail({ row }: { row: InventoryRow }) {
         <AlertReasonList reasons={reasons} />
       </header>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Stat label="Current units" value={formatNumber(row.currentUnits)} hint="Shopify on-hand" />
         <Stat label="Total units" value={formatNumber(row.totalUnits)} hint="3PL not yet connected" />
         <Stat

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -68,6 +69,61 @@ function SpikeCell({ pct }: { pct: number | null }) {
   );
 }
 
+// Mobile (< lg): each SKU is a stacked card, not a scrolling table row. Same data +
+// the SAME ReorderCell/SpikeCell/AlertBadge/AlertReasonText as the desktop table, so
+// there is one source of truth and the why-reason always sits beside the badge.
+function MobileCards({ rows }: { rows: InventoryRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+        No SKUs match the current filters.
+      </div>
+    );
+  }
+  return (
+    <ul className="divide-y divide-border">
+      {rows.map((r) => (
+        <li key={r.productId} className={cn("p-4", r.alertLevel === "critical" && "bg-red-50/60")}>
+          <Link
+            href={`/sku/${r.shopifyProductId}`}
+            className="block rounded-sm font-medium underline-offset-2 hover:text-brand hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
+          >
+            {r.name}
+          </Link>
+          <div className="text-xs text-muted-foreground">{CATEGORY_LABELS[r.category]}</div>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <AlertBadge level={r.alertLevel} />
+            <AlertReasonText reason={primaryAlertReason(r)} />
+          </div>
+          <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5">
+            <Field label="Units" value={<span className="tabular-nums">{formatNumber(r.currentUnits)}</span>} />
+            <Field
+              label="Days of stock"
+              value={
+                <span className="tabular-nums">
+                  {r.daysOfStockRemaining === null ? "—" : `${formatNumber(r.daysOfStockRemaining)}d`}
+                </span>
+              }
+            />
+            <Field label="Reorder date" value={<ReorderCell iso={r.reorderDate} />} />
+            <Field label="Spike" value={<SpikeCell pct={r.spikePct} />} />
+          </dl>
+          <div className="mt-3 text-xs text-muted-foreground">Updated {formatRelative(r.lastUpdated)}</div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Field({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs tracking-wide text-muted-foreground uppercase">{label}</dt>
+      <dd className="mt-0.5 text-sm">{value}</dd>
+    </div>
+  );
+}
+
 export function InventoryTable({
   rows,
   sort,
@@ -78,8 +134,16 @@ export function InventoryTable({
   dir: SortDir;
 }) {
   return (
-    <Table>
-      <TableHeader>
+    <>
+      {/* Mobile / tablet (< lg): stacked cards — no horizontal scroll. */}
+      <div className="lg:hidden">
+        <MobileCards rows={rows} />
+      </div>
+
+      {/* Desktop (lg+): the existing table, UNCHANGED. */}
+      <div className="hidden lg:block">
+        <Table>
+          <TableHeader>
         <TableRow className="hover:bg-transparent [&>th]:h-9 [&>th]:text-xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
           <TableHead>Product{sortMark(sort === "name", dir)}</TableHead>
           <TableHead>Category</TableHead>
@@ -149,6 +213,8 @@ export function InventoryTable({
           ))
         )}
       </TableBody>
-    </Table>
+        </Table>
+      </div>
+    </>
   );
 }
