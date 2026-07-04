@@ -30,6 +30,14 @@ interface ProjectionRow {
 const toNum = (v: number | string | null | undefined): number | null =>
   v === null || v === undefined ? null : Number(v);
 
+// DISPLAY normalization: the Shop-location `available` can go negative (oversold there
+// while real stock sits at the un-connected 3PL). Never surface a negative stock/DSR to
+// the user — clamp to 0 for display. The true values remain in the DB
+// (shopify_units_raw/on_hand/committed) and the projection engine reads raw shopify_units
+// directly, so tiers/reorder math are unaffected. Applied here at the seam so every view
+// (table, popup, SKU detail, alert emails) is consistent.
+const clampNonNeg = (v: number | null): number | null => (v === null ? null : Math.max(0, v));
+
 /**
  * THE DATA-ACCESS SEAM.
  *
@@ -100,11 +108,11 @@ export async function getInventoryRowsWith(supabase: SupabaseClient): Promise<In
       category: p.category as Category,
       leadTimeDays: p.lead_time_days,
       safetyStockDays: p.safety_stock_days,
-      currentUnits: toNum(s?.shopify_units),
-      totalUnits: toNum(s?.total_units),
+      currentUnits: clampNonNeg(toNum(s?.shopify_units)),
+      totalUnits: clampNonNeg(toNum(s?.total_units)),
       lastUpdated: s?.snapshot_at ?? null,
       dailyDemandRate: toNum(pr?.daily_demand_rate),
-      daysOfStockRemaining: toNum(pr?.days_of_stock_remaining),
+      daysOfStockRemaining: clampNonNeg(toNum(pr?.days_of_stock_remaining)),
       reorderDate: pr?.reorder_date ?? null,
       spikePct: toNum(pr?.spike_pct),
       alertLevel: (pr?.alert_level as AlertLevel | undefined) ?? null,
