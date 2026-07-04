@@ -80,7 +80,15 @@ Lead times by category (days): supplement_chews `98`, cbd `49`, treats `98`, sal
 |------|---------|----------|
 | Yellow | DSR <= threshold (150 for chews/treats; 90 for CBD) | Email |
 | Red | DSR <= 90 | Email + Slack |
-| Critical | DSR <= 45 OR reorder date passed OR spike >= 15% | Email + Slack (all) |
+| Critical | DSR <= 45 OR reorder date passed OR (spike >= 15% AND DSR <= red) | Email + Slack (all) |
+
+**Spike escalation (policy).** A demand spike (`spike_pct >= 15`) escalates a SKU to
+Critical **only when stock is also low** — i.e. `DSR <= deriveThresholds(...).red` for that
+SKU. On a well-stocked SKU (DSR above red) a spike does **not** force Critical: the SKU
+keeps its stock-based tier (ok/yellow/red) and the spike stays visible as the ▲% indicator
+(and is still counted in the "Spiking" summary). Overdue-reorder and `DSR <= critical`
+remain unconditional Criticals. Rationale: a transient demand bump on a SKU with months of
+stock is not a stockout risk — flagging it Critical erodes trust in the label.
 
 Dedup: don't re-fire the same SKU/tier unless DSR drops further or 24h pass. Check `alert_log.fired_at`.
 

@@ -136,9 +136,13 @@ export function classifyAlert(
   thresholds: Thresholds,
   config: ProjectionConfig = DEFAULT_CONFIG,
 ): AlertLevel {
-  if (spike_pct >= config.spikeAlertPct) return "critical";
+  // Act-now criticals (unconditional): an overdue reorder or critically-low stock.
   if (reorder_overdue) return "critical";
   if (dsr <= thresholds.critical) return "critical";
+  // A demand spike ESCALATES to critical ONLY when stock is ALSO low (DSR ≤ red).
+  // On a well-stocked SKU a spike is not a stockout risk, so it stays on its
+  // stock-based tier and is surfaced via the ▲% indicator instead of forcing critical.
+  if (spike_pct >= config.spikeAlertPct && dsr <= thresholds.red) return "critical";
   if (dsr <= thresholds.red) return "red";
   if (dsr <= thresholds.yellow) return "yellow";
   return "ok";

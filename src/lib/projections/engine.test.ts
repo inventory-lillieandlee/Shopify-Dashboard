@@ -97,9 +97,15 @@ test("classifyAlert: critical by DSR cutoff", () => {
 test("classifyAlert: critical by overdue", () => {
   assert.equal(classifyAlert(100, true, 0, CHEWS), "critical");
 });
-test("classifyAlert: critical by spike ≥ 15", () => {
-  assert.equal(classifyAlert(300, false, 15, CHEWS), "critical");
-  assert.equal(classifyAlert(300, false, 22, CHEWS), "critical");
+test("classifyAlert: spike + low stock (DSR ≤ red) ⇒ critical", () => {
+  // spike escalates to critical ONLY when stock is also low (DSR ≤ red = 138)
+  assert.equal(classifyAlert(100, false, 15, CHEWS), "critical"); // 100 ≤ 138
+  assert.equal(classifyAlert(135, false, 22, CHEWS), "critical"); // 135 ≤ 138
+});
+test("classifyAlert: spike + well-stocked (DSR > red) ⇒ NOT critical, keeps stock tier", () => {
+  // well-stocked spike stays on its stock tier; the ▲% indicator carries the signal
+  assert.equal(classifyAlert(300, false, 22, CHEWS), "ok"); // 300 > 150 → ok
+  assert.equal(classifyAlert(145, false, 41, CHEWS), "yellow"); // 138 < 145 ≤ 150 → yellow
 });
 
 // ── ROADMAP WORKED EXAMPLE (the gate) ───────────────────────────────────────
