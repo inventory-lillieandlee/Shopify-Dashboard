@@ -1,4 +1,5 @@
 import { getInventoryRows } from "@/lib/data/inventory";
+import { getMonthlySales } from "@/lib/data/monthly-sales";
 import {
   deriveSummary,
   reorderQueue,
@@ -48,7 +49,10 @@ export default async function Page({
     rawSort && SORT_KEYS.has(rawSort as SortKey) ? (rawSort as SortKey) : "dsr";
   const dir: SortDir = pick(sp.dir) === "desc" ? "desc" : "asc";
 
-  const all = await getInventoryRows();
+  // Parallel reads through the seam — no client-side waterfall for the popup chart.
+  const [all, sales] = await Promise.all([getInventoryRows(), getMonthlySales()]);
+  const now = new Date();
+  const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   const summary = deriveSummary(all);
   const queue = reorderQueue(all);
 
@@ -88,7 +92,7 @@ export default async function Page({
               "animate-in overflow-hidden duration-500 fade-in slide-in-from-bottom-2",
             )}
           >
-            <InventoryTable rows={rows} sort={sort} dir={dir} />
+            <InventoryTable rows={rows} sort={sort} dir={dir} sales={sales} currentMonth={currentMonth} />
           </div>
         </section>
 

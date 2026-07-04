@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
-import Link from "next/link";
+"use client";
+
+import { useState, type ReactNode, type KeyboardEvent } from "react";
 import {
   Table,
   TableBody,
@@ -10,8 +11,10 @@ import {
 } from "@/components/ui/table";
 import { AlertBadge } from "@/components/alert-badge";
 import { AlertReasonText } from "@/components/alert-reason";
+import { SalesPopup } from "@/components/sales-popup";
 import { cn } from "@/lib/utils";
 import type { InventoryRow } from "@/lib/data/types";
+import type { MonthlySale } from "@/lib/sales";
 import {
   CATEGORY_LABELS,
   daysUntil,
@@ -51,8 +54,6 @@ function SpikeCell({ pct }: { pct: number | null }) {
     return <span className="text-muted-foreground">—</span>;
   }
   const critical = pct >= SPIKE_ALERT_THRESHOLD;
-  // SOLID opaque chip — never translucent over the surfaces. AA-verified:
-  // ≥15% red 5.30:1, 10–14% amber 6.37:1.
   const title = critical
     ? `${formatNumber(pct, 0)}% above projected 7-day demand — spike alert (≥${SPIKE_ALERT_THRESHOLD}%)`
     : `${formatNumber(pct, 0)}% above projected 7-day demand — watch (below ${SPIKE_ALERT_THRESHOLD}% alert)`;
@@ -69,27 +70,36 @@ function SpikeCell({ pct }: { pct: number | null }) {
   );
 }
 
-// Mobile (< lg): each SKU is a stacked card, not a scrolling table row. Same data +
-// the SAME ReorderCell/SpikeCell/AlertBadge/AlertReasonText as the desktop table, so
-// there is one source of truth and the why-reason always sits beside the badge.
-function MobileCards({ rows }: { rows: InventoryRow[] }) {
+// Enter/Space activate a clickable row/card (they carry role="button").
+function onActivate(e: KeyboardEvent, fn: () => void) {
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    fn();
+  }
+}
+
+// Mobile (< lg): each SKU is a stacked card (no horizontal scroll). Whole card opens
+// the sales popup; same ReorderCell/SpikeCell/AlertBadge as the desktop table.
+function MobileCards({ rows, onOpen }: { rows: InventoryRow[]; onOpen: (r: InventoryRow) => void }) {
   if (rows.length === 0) {
-    return (
-      <div className="px-4 py-10 text-center text-sm text-muted-foreground">
-        No SKUs match the current filters.
-      </div>
-    );
+    return <div className="px-4 py-10 text-center text-sm text-muted-foreground">No SKUs match the current filters.</div>;
   }
   return (
     <ul className="divide-y divide-border">
       {rows.map((r) => (
-        <li key={r.productId} className={cn("p-4", r.alertLevel === "critical" && "bg-red-50/60")}>
-          <Link
-            href={`/sku/${r.shopifyProductId}`}
-            className="block rounded-sm font-medium underline-offset-2 hover:text-brand hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
-          >
-            {r.name}
-          </Link>
+        <li
+          key={r.productId}
+          role="button"
+          tabIndex={0}
+          aria-label={`${r.name} — sales & details`}
+          onClick={() => onOpen(r)}
+          onKeyDown={(e) => onActivate(e, () => onOpen(r))}
+          className={cn(
+            "cursor-pointer p-4 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none",
+            r.alertLevel === "critical" && "bg-red-50/60",
+          )}
+        >
+          <div className="font-medium text-brand">{r.name}</div>
           <div className="text-xs text-muted-foreground">{CATEGORY_LABELS[r.category]}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <AlertBadge level={r.alertLevel} />
@@ -99,11 +109,7 @@ function MobileCards({ rows }: { rows: InventoryRow[] }) {
             <Field label="Units" value={<span className="tabular-nums">{formatNumber(r.currentUnits)}</span>} />
             <Field
               label="Days of stock"
-              value={
-                <span className="tabular-nums">
-                  {r.daysOfStockRemaining === null ? "—" : `${formatNumber(r.daysOfStockRemaining)}d`}
-                </span>
-              }
+              value={<span className="tabular-nums">{r.daysOfStockRemaining === null ? "—" : `${formatNumber(r.daysOfStockRemaining)}d`}</span>}
             />
             <Field label="Reorder date" value={<ReorderCell iso={r.reorderDate} />} />
             <Field label="Spike" value={<SpikeCell pct={r.spikePct} />} />
@@ -128,93 +134,91 @@ export function InventoryTable({
   rows,
   sort,
   dir,
+  sales,
+  currentMonth,
 }: {
   rows: InventoryRow[];
   sort: SortKey;
   dir: SortDir;
+  sales: Record<string, MonthlySale[]>;
+  currentMonth: string;
 }) {
+  const [selected, setSelected] = useState<InventoryRow | null>(null);
+
   return (
     <>
-      {/* Mobile / tablet (< lg): stacked cards — no horizontal scroll. */}
+      {/* Mobile / tablet (< lg): stacked cards. */}
       <div className="lg:hidden">
-        <MobileCards rows={rows} />
+        <MobileCards rows={rows} onOpen={setSelected} />
       </div>
 
-      {/* Desktop (lg+): the existing table, UNCHANGED. */}
+      {/* Desktop (lg+): table; each row opens the popup. */}
       <div className="hidden lg:block">
         <Table>
           <TableHeader>
-        <TableRow className="hover:bg-transparent [&>th]:h-9 [&>th]:text-xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
-          <TableHead>Product{sortMark(sort === "name", dir)}</TableHead>
-          <TableHead>Category</TableHead>
-          <TableHead className="text-right">
-            Current Units{sortMark(sort === "units", dir)}
-          </TableHead>
-          <TableHead className="text-right">
-            Days of Stock{sortMark(sort === "dsr", dir)}
-          </TableHead>
-          <TableHead>Reorder Date</TableHead>
-          <TableHead>Alert</TableHead>
-          <TableHead>Spike</TableHead>
-          <TableHead className="text-right">Last Updated</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.length === 0 ? (
-          <TableRow>
-            <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
-              No SKUs match the current filters.
-            </TableCell>
-          </TableRow>
-        ) : (
-          rows.map((r) => (
-            <TableRow
-              key={r.productId}
-              className={cn(r.alertLevel === "critical" && "bg-red-50/60")}
-            >
-              <TableCell className="font-medium">
-                <Link
-                  href={`/sku/${r.shopifyProductId}`}
-                  className="rounded-sm underline-offset-2 hover:text-brand hover:underline focus-visible:ring-2 focus-visible:ring-ring/40 focus-visible:outline-none"
-                >
-                  {r.name}
-                </Link>
-              </TableCell>
-              <TableCell className="text-muted-foreground">
-                {CATEGORY_LABELS[r.category]}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatNumber(r.currentUnits)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {r.daysOfStockRemaining === null
-                  ? "—"
-                  : `${formatNumber(r.daysOfStockRemaining)}d`}
-              </TableCell>
-              <TableCell>
-                <ReorderCell iso={r.reorderDate} />
-              </TableCell>
-              <TableCell className="whitespace-nowrap">
-                <div className="flex items-center gap-1.5">
-                  <AlertBadge level={r.alertLevel} />
-                  <AlertReasonText
-                    reason={primaryAlertReason(r)}
-                    className="whitespace-nowrap"
-                  />
-                </div>
-              </TableCell>
-              <TableCell>
-                <SpikeCell pct={r.spikePct} />
-              </TableCell>
-              <TableCell className="text-right text-muted-foreground">
-                {formatRelative(r.lastUpdated)}
-              </TableCell>
+            <TableRow className="hover:bg-transparent [&>th]:h-9 [&>th]:text-xs [&>th]:font-medium [&>th]:uppercase [&>th]:tracking-wide [&>th]:text-muted-foreground">
+              <TableHead>Product{sortMark(sort === "name", dir)}</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead className="text-right">Current Units{sortMark(sort === "units", dir)}</TableHead>
+              <TableHead className="text-right">Days of Stock{sortMark(sort === "dsr", dir)}</TableHead>
+              <TableHead>Reorder Date</TableHead>
+              <TableHead>Alert</TableHead>
+              <TableHead>Spike</TableHead>
+              <TableHead className="text-right">Last Updated</TableHead>
             </TableRow>
-          ))
-        )}
-      </TableBody>
+          </TableHeader>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  No SKUs match the current filters.
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((r) => (
+                <TableRow
+                  key={r.productId}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${r.name} — sales & details`}
+                  onClick={() => setSelected(r)}
+                  onKeyDown={(e) => onActivate(e, () => setSelected(r))}
+                  className={cn("cursor-pointer", r.alertLevel === "critical" && "bg-red-50/60")}
+                >
+                  <TableCell className="font-medium text-brand">{r.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{CATEGORY_LABELS[r.category]}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatNumber(r.currentUnits)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {r.daysOfStockRemaining === null ? "—" : `${formatNumber(r.daysOfStockRemaining)}d`}
+                  </TableCell>
+                  <TableCell>
+                    <ReorderCell iso={r.reorderDate} />
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <AlertBadge level={r.alertLevel} />
+                      <AlertReasonText reason={primaryAlertReason(r)} className="whitespace-nowrap" />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <SpikeCell pct={r.spikePct} />
+                  </TableCell>
+                  <TableCell className="text-right text-muted-foreground">{formatRelative(r.lastUpdated)}</TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
         </Table>
       </div>
+
+      {selected && (
+        <SalesPopup
+          row={selected}
+          sales={sales[selected.productId] ?? []}
+          currentMonth={currentMonth}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   );
 }
