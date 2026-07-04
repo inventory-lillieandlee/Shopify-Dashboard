@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeDemand, clampUnits } from "./demand.ts";
+import { computeDemand, clampUnits, aggregateSales } from "./demand.ts";
 import type { ShopifyOrder } from "./orders.ts";
 
 const NOW = new Date(Date.UTC(2026, 6, 1, 12, 0, 0));
@@ -46,4 +46,30 @@ test("clampUnits: negatives clamp to 0", () => {
   assert.equal(clampUnits(-3), 0);
   assert.equal(clampUnits(undefined), 0);
   assert.equal(clampUnits(12), 12);
+});
+
+test("aggregateSales: rolling windows net refunds at the sale time", () => {
+  const { windows } = aggregateSales(orders, NOW);
+  const w100 = windows.get(100);
+  assert.equal(w100?.d7, 5); // 2-day order
+  assert.equal(w100?.d30, 8); // 5 + 3
+  assert.equal(w100?.d90, 8 + 99); // includes the 40-day order (in 90d, not 30d)
+  const w200 = windows.get(200);
+  assert.equal(w200?.d30, 1); // 2 - 1 refunded, netted into the 10-day window
+});
+
+test("aggregateSales: monthly buckets by sale month, refund netted to sale month", () => {
+  // sale of 10 v300 on 2026-05-15, refund 4 → net 6 in 2026-05, even though "now" is July
+  const orders2: ShopifyOrder[] = [
+    {
+      id: 9,
+      created_at: "2026-05-15T00:00:00Z",
+      line_items: [{ id: 91, variant_id: 300, quantity: 10 }],
+      refunds: [{ refund_line_items: [{ line_item_id: 91, quantity: 4 }] }],
+    },
+  ];
+  const { monthKeys, monthly } = aggregateSales(orders2, NOW);
+  assert.equal(monthKeys.length, 6);
+  assert.deepEqual(monthKeys, ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"]);
+  assert.equal(monthly.get(300)?.get("2026-05"), 6); // 10 - 4, in the SALE month
 });

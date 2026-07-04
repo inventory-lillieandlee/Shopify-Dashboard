@@ -16,6 +16,9 @@ export interface OrderRefund {
 export interface ShopifyOrder {
   id: number;
   created_at: string;
+  /** Set when the order was cancelled (null otherwise). Only populated when requested
+   *  in `fields` — the demand-sync default omits it; the backfill script requests it. */
+  cancelled_at?: string | null;
   line_items: OrderLineItem[];
   refunds: OrderRefund[];
 }
@@ -32,11 +35,17 @@ function parseNextLink(link: string | null): string | null {
 /**
  * Pull every order created since `sinceIso` via cursor pagination (slim fields).
  * `status=any` includes open/closed/cancelled; the demand calc nets refunds.
+ * `fields` defaults to the demand-sync set; the 6-month backfill passes a wider set
+ * (adds cancelled_at) — orders >60 days old require the read_all_orders scope.
  */
-export async function fetchOrdersSince(sinceIso: string, maxPages = 200): Promise<ShopifyOrder[]> {
+export async function fetchOrdersSince(
+  sinceIso: string,
+  maxPages = 200,
+  fields = "id,created_at,line_items,refunds",
+): Promise<ShopifyOrder[]> {
   const firstPath =
     `orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(sinceIso)}` +
-    `&fields=id,created_at,line_items,refunds`;
+    `&fields=${encodeURIComponent(fields)}`;
   const out: ShopifyOrder[] = [];
   let res = await shopifyRest<{ orders: ShopifyOrder[] }>(firstPath);
   let pages = 0;
