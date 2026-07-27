@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { AlertBadge } from "@/components/alert-badge";
 import { AlertReasonList } from "@/components/alert-reason";
 import { SalesChart } from "@/components/ui/sales-chart";
-import { lastNMonths, shortMonth, longMonthYear, isSalesStale, type MonthlySale } from "@/lib/sales";
+import { lastNMonths, trimLeadingZeroMonths, shortMonth, longMonthYear, isSalesStale, type MonthlySale } from "@/lib/sales";
 import { CATEGORY_LABELS, alertReasons, daysUntil } from "@/lib/dashboard";
 import { formatDate, formatNumber, formatRelative, reorderLabel } from "@/lib/format";
 import type { InventoryRow } from "@/lib/data/types";
@@ -48,7 +48,12 @@ export function SalesPopup({
   }, [onClose]);
 
   const bars = useMemo(
-    () => lastNMonths(sales, months).map((s) => ({ label: shortMonth(s.month), units: s.units, partial: s.month === currentMonth })),
+    () =>
+      lastNMonths(trimLeadingZeroMonths(sales), months).map((s) => ({
+        label: shortMonth(s.month),
+        units: s.units,
+        partial: s.month === currentMonth,
+      })),
     [sales, months, currentMonth],
   );
   const reasons = alertReasons(row);
@@ -125,9 +130,8 @@ export function SalesPopup({
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {historyStart && (
               <>
-                History starts{" "}
-                <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong> — earlier months
-                show 0.{" "}
+                Sales history starts{" "}
+                <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong>.{" "}
               </>
             )}
             The current month is partial (<em>MTD</em>).

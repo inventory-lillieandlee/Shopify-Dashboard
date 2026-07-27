@@ -13,17 +13,29 @@ export function lastNMonths(sales: MonthlySale[], n: number): MonthlySale[] {
 }
 
 /**
- * Earliest month present across all SKUs ("YYYY-MM"), or null when there's no history.
- * This is the point before which the dataset simply has no data — leading chart zeros
- * are "not tracked yet", not literal zero sales. "YYYY-MM" is zero-padded so lexical
- * string comparison is chronological; no Date parsing needed.
+ * Earliest month with ANY sales across all SKUs ("YYYY-MM"), or null when there are no
+ * sales yet. This is the true data floor: the backfill writes zero rows for months
+ * before the store ramped (Feb/Mar are all-zero), and flooring at those makes the chart
+ * open on flat empty bars that read as broken. We floor at the first month that actually
+ * has units. "YYYY-MM" is zero-padded, so lexical string comparison is chronological.
  */
 export function historyStartMonth(byProduct: Record<string, MonthlySale[]>): string | null {
   let min: string | null = null;
   for (const arr of Object.values(byProduct)) {
-    for (const s of arr) if (min === null || s.month < min) min = s.month;
+    for (const s of arr) if (s.units > 0 && (min === null || s.month < min)) min = s.month;
   }
   return min;
+}
+
+/**
+ * Drop leading all-zero months from a SKU's series so its chart opens on the first month
+ * it actually sold, not on empty bars from before it launched. Interior/trailing zeros
+ * (a real month with no sales) are kept. All-zero series is returned unchanged (the
+ * popup's empty-state copy covers "no sales yet").
+ */
+export function trimLeadingZeroMonths(sales: MonthlySale[]): MonthlySale[] {
+  const first = sales.findIndex((s) => s.units > 0);
+  return first > 0 ? sales.slice(first) : sales;
 }
 
 /**

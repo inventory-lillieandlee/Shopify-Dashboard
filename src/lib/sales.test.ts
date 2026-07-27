@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lastNMonths, monthLabel, historyStartMonth, longMonthYear, isSalesStale, type MonthlySale } from "./sales.ts";
+import { lastNMonths, monthLabel, historyStartMonth, trimLeadingZeroMonths, longMonthYear, isSalesStale, type MonthlySale } from "./sales.ts";
 
 const S: MonthlySale[] = [
   { month: "2026-02", units: 0 },
@@ -27,11 +27,25 @@ test("monthLabel: MTD only on the current month", () => {
   assert.equal(monthLabel("2026-07", "2026-07"), "Jul (MTD)");
 });
 
-test("historyStartMonth: global min across SKUs (chronological via string compare)", () => {
+test("historyStartMonth: earliest month WITH sales (leading zero months ignored)", () => {
+  assert.equal(historyStartMonth({ a: S }), "2026-04"); // Feb/Mar are 0 → not the floor
   assert.equal(historyStartMonth({ a: S, b: [{ month: "2026-01", units: 3 }] }), "2026-01");
-  assert.equal(historyStartMonth({ a: S }), "2026-02");
+  assert.equal(historyStartMonth({ a: [{ month: "2026-02", units: 0 }] }), null); // all-zero → no history
   assert.equal(historyStartMonth({}), null);
   assert.equal(historyStartMonth({ a: [] }), null);
+});
+
+test("trimLeadingZeroMonths: drop leading empties, keep from first sale onward", () => {
+  assert.deepEqual(trimLeadingZeroMonths(S).map((x) => x.month), ["2026-04", "2026-05", "2026-06", "2026-07"]);
+  // interior zero kept; only LEADING zeros dropped
+  const mid: MonthlySale[] = [
+    { month: "2026-05", units: 0 },
+    { month: "2026-06", units: 2 },
+    { month: "2026-07", units: 0 },
+  ];
+  assert.deepEqual(trimLeadingZeroMonths(mid).map((x) => x.month), ["2026-06", "2026-07"]);
+  // all-zero series unchanged (empty-state copy handles it)
+  assert.equal(trimLeadingZeroMonths([{ month: "2026-02", units: 0 }]).length, 1);
 });
 
 test("longMonthYear: full month + year in UTC", () => {
