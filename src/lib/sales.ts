@@ -26,6 +26,17 @@ export function historyStartMonth(byProduct: Record<string, MonthlySale[]>): str
   return min;
 }
 
+/**
+ * Whether the current-month sales row is stale — older than `thresholdMs` (default 6h),
+ * so the chart's live month may trail Shopify. `null` updatedAt → not stale (there's
+ * nothing to compare; the chart's empty-state covers "no data"). Pure: `nowMs` is passed
+ * in so it's deterministic and testable.
+ */
+export function isSalesStale(updatedAt: string | null, nowMs: number, thresholdMs = 6 * 60 * 60 * 1000): boolean {
+  if (!updatedAt) return false;
+  return nowMs - new Date(updatedAt).getTime() > thresholdMs;
+}
+
 /** "YYYY-MM" → full month + year, e.g. "February 2026". */
 export function longMonthYear(month: string): string {
   const [y, m] = month.split("-").map(Number);

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lastNMonths, monthLabel, historyStartMonth, longMonthYear, type MonthlySale } from "./sales.ts";
+import { lastNMonths, monthLabel, historyStartMonth, longMonthYear, isSalesStale, type MonthlySale } from "./sales.ts";
 
 const S: MonthlySale[] = [
   { month: "2026-02", units: 0 },
@@ -37,4 +37,13 @@ test("historyStartMonth: global min across SKUs (chronological via string compar
 test("longMonthYear: full month + year in UTC", () => {
   assert.equal(longMonthYear("2026-02"), "February 2026");
   assert.equal(longMonthYear("2026-12"), "December 2026");
+});
+
+test("isSalesStale: true only past the 6h threshold; null is never stale", () => {
+  const now = Date.parse("2026-07-28T12:00:00Z");
+  assert.equal(isSalesStale(null, now), false); // nothing to compare
+  assert.equal(isSalesStale("2026-07-28T11:00:00Z", now), false); // 1h old
+  assert.equal(isSalesStale("2026-07-28T05:59:00Z", now), true); // 6h01m old
+  assert.equal(isSalesStale("2026-07-28T06:01:00Z", now), false); // 5h59m old — just under
+  assert.equal(isSalesStale("2026-07-27T12:00:00Z", now), true); // 24h old
 });

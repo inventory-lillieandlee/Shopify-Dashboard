@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { X } from "lucide-react";
+import { X, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertBadge } from "@/components/alert-badge";
 import { AlertReasonList } from "@/components/alert-reason";
 import { SalesChart } from "@/components/ui/sales-chart";
-import { lastNMonths, shortMonth, longMonthYear, type MonthlySale } from "@/lib/sales";
+import { lastNMonths, shortMonth, longMonthYear, isSalesStale, type MonthlySale } from "@/lib/sales";
 import { CATEGORY_LABELS, alertReasons, daysUntil } from "@/lib/dashboard";
-import { formatDate, formatNumber, reorderLabel } from "@/lib/format";
+import { formatDate, formatNumber, formatRelative, reorderLabel } from "@/lib/format";
 import type { InventoryRow } from "@/lib/data/types";
 
 const RANGES = [1, 3, 6] as const;
@@ -22,12 +22,14 @@ export function SalesPopup({
   sales,
   currentMonth,
   historyStart,
+  salesUpdatedAt,
   onClose,
 }: {
   row: InventoryRow;
   sales: MonthlySale[];
   currentMonth: string;
   historyStart: string | null;
+  salesUpdatedAt: string | null;
   onClose: () => void;
 }) {
   const [months, setMonths] = useState<Range>(6);
@@ -51,6 +53,10 @@ export function SalesPopup({
   );
   const reasons = alertReasons(row);
   const horizon = daysUntil(row.reorderDate);
+  // Sales chart freshness. The current-month bar is only trustworthy if the sales sync
+  // ran recently; flag it when the current month's row is >6h old. (Not snapshot_at —
+  // inventory refreshes on its own cron and would mask a stalled sales sync.)
+  const salesStale = isSalesStale(salesUpdatedAt, Date.now());
 
   return (
     <div
@@ -126,6 +132,19 @@ export function SalesPopup({
             )}
             The current month is partial (<em>MTD</em>).
           </p>
+
+          {salesStale && (
+            <p
+              role="status"
+              className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs leading-relaxed text-amber-700 dark:text-amber-400"
+            >
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              <span>
+                Sales last synced <strong className="font-medium">{formatRelative(salesUpdatedAt)}</strong> — the current
+                month may trail live Shopify.
+              </span>
+            </p>
+          )}
 
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <Stat label="Current units" value={formatNumber(row.currentUnits)} />
