@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchOrdersSince } from "@/lib/shopify/orders";
+import { fetchShopTimeZone } from "@/lib/shopify/shop";
 import { syncMonthlySales, syncDemand, monthlyRefreshSince, type ProductRef } from "@/lib/shopify/sales-sync";
 
 export const runtime = "nodejs";
@@ -31,15 +32,19 @@ export async function GET(req: Request) {
     const products = (data ?? []) as ProductRef[];
 
     const since = monthlyRefreshSince(now).toISOString();
-    const orders = await fetchOrdersSince(since, 300, "id,created_at,cancelled_at,test,line_items,refunds");
+    const [orders, timeZone] = await Promise.all([
+      fetchOrdersSince(since, 300, "id,created_at,cancelled_at,test,line_items,refunds"),
+      fetchShopTimeZone(), // shop-local month bucketing
+    ]);
 
-    const monthly = await syncMonthlySales(admin, products, orders, now, 2); // prev + current
+    const monthly = await syncMonthlySales(admin, products, orders, now, 2, timeZone); // prev + current
     const demand = await syncDemand(admin, products, orders, now); // trailing 30d/7d
 
     return Response.json({
       ok: true,
       now: now.toISOString(),
       since,
+      timeZone,
       orders: orders.length,
       months: monthly.monthKeys,
       monthly_upserted: monthly.upserted,

@@ -57,6 +57,19 @@ async function shopToken(): Promise<string> {
   if (!res.ok) throw new Error(`token grant ${res.status}`);
   return (await res.json()).access_token;
 }
+// Shop IANA timezone for shop-local month bucketing (falls back to UTC).
+async function shopTimeZone(): Promise<string> {
+  try {
+    const token = await shopToken();
+    const res = await fetchRetry(`${store}/admin/api/${ver}/shop.json?fields=iana_timezone`, {
+      headers: { "X-Shopify-Access-Token": token },
+    });
+    if (!res.ok) return "UTC";
+    return (await res.json())?.shop?.iana_timezone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 function nextLink(link: string | null): string | null {
   if (!link) return null;
   for (const p of link.split(",")) {
@@ -115,7 +128,8 @@ async function main() {
   console.log(`now=${now.toISOString()}  since=${since.toISOString()}  api=${ver}`);
 
   const { orders, pages } = await fetchOrders(since.toISOString());
-  console.log(`pulled ${orders.length} orders across ${pages} page(s)\n`);
+  const tz = await shopTimeZone();
+  console.log(`pulled ${orders.length} orders across ${pages} page(s); shop tz=${tz}\n`);
 
   // ── refund / cancellation accounting ──
   let cancelled = 0, cancelledUnrefunded = 0, cancelledUnrefundedUnits = 0, refundedOrders = 0;
@@ -132,7 +146,7 @@ async function main() {
   }
 
   // ── aggregate (cancelled+test excluded, nets refunds to the SALE month/window) ──
-  const agg = aggregateSales(sellableOrders(orders as never), now, 6);
+  const agg = aggregateSales(sellableOrders(orders as never), now, 6, tz);
 
   // ── DB reads (service-role, read-only) ──
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -239,7 +253,7 @@ async function main() {
 
   // monthly_sales + sku_demand via the SHARED writers (one code path with the cron;
   // cancelled + test excluded, refunds netted). Reuse the returned aggregate below.
-  const ms = await syncMonthlySales(admin, (products ?? []) as never, orders as unknown as never, now, 6);
+  const ms = await syncMonthlySales(admin, (products ?? []) as never, orders as unknown as never, now, 6, tz);
   const aggW = ms.aggregate;
   console.log(`monthly_sales: upserted ${ms.upserted} rows across months ${ms.monthKeys.join(", ")}`);
   const sd = await syncDemand(admin, (products ?? []) as never, orders as unknown as never, now);

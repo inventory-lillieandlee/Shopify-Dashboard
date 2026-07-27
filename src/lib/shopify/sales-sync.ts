@@ -37,8 +37,9 @@ export async function syncMonthlySales(
   orders: ShopifyOrder[],
   now: Date,
   monthsBack: number,
+  timeZone = "UTC",
 ): Promise<{ upserted: number; monthKeys: string[]; aggregate: SalesAggregate }> {
-  const agg = aggregateSales(sellableOrders(orders), now, monthsBack);
+  const agg = aggregateSales(sellableOrders(orders), now, monthsBack, timeZone);
   const stamp = now.toISOString();
   const rows: { product_id: string; month: string; units_sold: number; updated_at: string }[] = [];
   for (const p of products) {

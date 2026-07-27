@@ -73,3 +73,19 @@ test("aggregateSales: monthly buckets by sale month, refund netted to sale month
   assert.deepEqual(monthKeys, ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"]);
   assert.equal(monthly.get(300)?.get("2026-05"), 6); // 10 - 4, in the SALE month
 });
+
+test("aggregateSales: buckets in the shop's local month, not UTC (month boundary)", () => {
+  // 2026-07-01T06:30Z is 2026-06-30 23:30 in America/Los_Angeles (PDT, UTC-7) — a JUNE
+  // sale for a Pacific shop, but JULY under naive UTC bucketing.
+  const boundary: ShopifyOrder[] = [
+    { id: 7, created_at: "2026-07-01T06:30:00Z", line_items: [{ id: 71, variant_id: 400, quantity: 9 }], refunds: [] },
+  ];
+
+  const utc = aggregateSales(boundary, NOW); // default "UTC"
+  assert.equal(utc.monthly.get(400)?.get("2026-07"), 9);
+  assert.equal(utc.monthly.get(400)?.get("2026-06") ?? 0, 0);
+
+  const la = aggregateSales(boundary, NOW, 6, "America/Los_Angeles");
+  assert.equal(la.monthly.get(400)?.get("2026-06"), 9); // shop-local → June
+  assert.equal(la.monthly.get(400)?.get("2026-07") ?? 0, 0);
+});
