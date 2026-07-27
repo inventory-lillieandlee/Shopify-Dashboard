@@ -136,12 +136,14 @@ export function InventoryTable({
   dir,
   sales,
   currentMonth,
+  historyStart,
 }: {
   rows: InventoryRow[];
   sort: SortKey;
   dir: SortDir;
   sales: Record<string, MonthlySale[]>;
   currentMonth: string;
+  historyStart: string | null;
 }) {
   const [selected, setSelected] = useState<InventoryRow | null>(null);
 
@@ -216,6 +218,7 @@ export function InventoryTable({
           row={selected}
           sales={sales[selected.productId] ?? []}
           currentMonth={currentMonth}
+          historyStart={historyStart}
           onClose={() => setSelected(null)}
         />
       )}

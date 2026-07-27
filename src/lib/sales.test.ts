@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lastNMonths, monthLabel, type MonthlySale } from "./sales.ts";
+import { lastNMonths, monthLabel, historyStartMonth, longMonthYear, type MonthlySale } from "./sales.ts";
 
 const S: MonthlySale[] = [
   { month: "2026-02", units: 0 },
@@ -25,4 +25,16 @@ test("lastNMonths: fewer than n → all; n<=0 → empty", () => {
 test("monthLabel: MTD only on the current month", () => {
   assert.equal(monthLabel("2026-06", "2026-07"), "Jun");
   assert.equal(monthLabel("2026-07", "2026-07"), "Jul (MTD)");
+});
+
+test("historyStartMonth: global min across SKUs (chronological via string compare)", () => {
+  assert.equal(historyStartMonth({ a: S, b: [{ month: "2026-01", units: 3 }] }), "2026-01");
+  assert.equal(historyStartMonth({ a: S }), "2026-02");
+  assert.equal(historyStartMonth({}), null);
+  assert.equal(historyStartMonth({ a: [] }), null);
+});
+
+test("longMonthYear: full month + year in UTC", () => {
+  assert.equal(longMonthYear("2026-02"), "February 2026");
+  assert.equal(longMonthYear("2026-12"), "December 2026");
 });

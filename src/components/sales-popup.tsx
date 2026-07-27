@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { AlertBadge } from "@/components/alert-badge";
 import { AlertReasonList } from "@/components/alert-reason";
 import { SalesChart } from "@/components/ui/sales-chart";
-import { lastNMonths, shortMonth, type MonthlySale } from "@/lib/sales";
+import { lastNMonths, shortMonth, longMonthYear, type MonthlySale } from "@/lib/sales";
 import { CATEGORY_LABELS, alertReasons, daysUntil } from "@/lib/dashboard";
 import { formatDate, formatNumber, reorderLabel } from "@/lib/format";
 import type { InventoryRow } from "@/lib/data/types";
@@ -21,11 +21,13 @@ export function SalesPopup({
   row,
   sales,
   currentMonth,
+  historyStart,
   onClose,
 }: {
   row: InventoryRow;
   sales: MonthlySale[];
   currentMonth: string;
+  historyStart: string | null;
   onClose: () => void;
 }) {
   const [months, setMonths] = useState<Range>(6);
@@ -115,7 +117,13 @@ export function SalesPopup({
           )}
 
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            History starts <strong className="font-medium text-foreground">April 2026</strong> — earlier months show 0.
+            {historyStart && (
+              <>
+                History starts{" "}
+                <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong> — earlier months
+                show 0.{" "}
+              </>
+            )}
             The current month is partial (<em>MTD</em>).
           </p>
 

@@ -1,5 +1,6 @@
 import { getInventoryRows } from "@/lib/data/inventory";
 import { getMonthlySales } from "@/lib/data/monthly-sales";
+import { historyStartMonth } from "@/lib/sales";
 import {
   deriveSummary,
   reorderQueue,
@@ -53,6 +54,7 @@ export default async function Page({
   const [all, sales] = await Promise.all([getInventoryRows(), getMonthlySales()]);
   const now = new Date();
   const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const historyStart = historyStartMonth(sales); // earliest tracked month, derived from data
   const summary = deriveSummary(all);
   const queue = reorderQueue(all);
 
@@ -92,7 +94,7 @@ export default async function Page({
               "animate-in overflow-hidden duration-500 fade-in slide-in-from-bottom-2",
             )}
           >
-            <InventoryTable rows={rows} sort={sort} dir={dir} sales={sales} currentMonth={currentMonth} />
+            <InventoryTable rows={rows} sort={sort} dir={dir} sales={sales} currentMonth={currentMonth} historyStart={historyStart} />
           </div>
         </section>
 
