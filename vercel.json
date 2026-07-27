@@ -7,7 +7,7 @@
     },
     {
       "path": "/api/cron/recompute-and-alert",
-      "schedule": "* * * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }
