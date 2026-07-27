@@ -51,6 +51,15 @@ export function clampUnits(n: number | undefined): number {
   return Math.max(n ?? 0, 0);
 }
 
+/**
+ * The orders that count as real sales — cancelled and test orders removed. Refunds
+ * are NOT filtered here (they're netted per-line inside computeDemand/aggregateSales).
+ * Single source of the exclusion rule so the cron and the backfill agree exactly.
+ */
+export function sellableOrders(orders: ShopifyOrder[]): ShopifyOrder[] {
+  return orders.filter((o) => !o.cancelled_at && o.test !== true);
+}
+
 // ── 6-month aggregation for the backfill (pure, extends the 30d/7d model) ──────
 // Per variant_id: units per calendar month (last N months) + rolling 7/30/60/90-day
 // totals, all NET of refunds. CONVENTION: a refund is netted against the SALE's month

@@ -16,9 +16,11 @@ export interface OrderRefund {
 export interface ShopifyOrder {
   id: number;
   created_at: string;
-  /** Set when the order was cancelled (null otherwise). Only populated when requested
-   *  in `fields` — the demand-sync default omits it; the backfill script requests it. */
+  /** Set when the order was cancelled (null otherwise). Populated only when requested
+   *  in `fields`. */
   cancelled_at?: string | null;
+  /** Shopify test order (Bogus gateway / test mode). Excluded from sales + demand. */
+  test?: boolean;
   line_items: OrderLineItem[];
   refunds: OrderRefund[];
 }
