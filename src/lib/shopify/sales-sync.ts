@@ -13,6 +13,19 @@ export interface ProductRef {
 }
 
 /**
+ * The order-pull start for the monthly refresh: the first instant (UTC) of the PREVIOUS
+ * month, OR now−31d if that is earlier. The min() guards the month-start edge — on e.g.
+ * the 1st–2nd, the previous month began fewer than 31 days ago, so now−31d reaches
+ * further back and keeps the trailing-30d demand window fully covered. Guarantees the
+ * pull spans BOTH the entire previous month and the 30-day demand window. Exported so
+ * the demand-sync cron and the month-boundary test share ONE definition (no drift).
+ */
+export function monthlyRefreshSince(now: Date): Date {
+  const firstOfPrevMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1);
+  return new Date(Math.min(firstOfPrevMonth, now.getTime() - 31 * 86_400_000));
+}
+
+/**
  * Aggregate real sales (cancelled + test excluded, refunds netted to the sale month)
  * and upsert monthly_sales for the aggregate's month keys. Idempotent on
  * (product_id, month); sets updated_at on EVERY write (upsert doesn't auto-bump it).

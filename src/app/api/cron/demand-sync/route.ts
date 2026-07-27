@@ -1,6 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { fetchOrdersSince } from "@/lib/shopify/orders";
-import { syncMonthlySales, syncDemand, type ProductRef } from "@/lib/shopify/sales-sync";
+import { syncMonthlySales, syncDemand, monthlyRefreshSince, type ProductRef } from "@/lib/shopify/sales-sync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,8 +30,7 @@ export async function GET(req: Request) {
     if (error) throw new Error(`products: ${error.message}`);
     const products = (data ?? []) as ProductRef[];
 
-    const firstOfPrevMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1);
-    const since = new Date(Math.min(firstOfPrevMonth, now.getTime() - 31 * 86_400_000)).toISOString();
+    const since = monthlyRefreshSince(now).toISOString();
     const orders = await fetchOrdersSince(since, 300, "id,created_at,cancelled_at,test,line_items,refunds");
 
     const monthly = await syncMonthlySales(admin, products, orders, now, 2); // prev + current
