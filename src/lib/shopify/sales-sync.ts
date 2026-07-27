@@ -19,6 +19,15 @@ export interface ProductRef {
  * further back and keeps the trailing-30d demand window fully covered. Guarantees the
  * pull spans BOTH the entire previous month and the 30-day demand window. Exported so
  * the demand-sync cron and the month-boundary test share ONE definition (no drift).
+ *
+ * TIMEZONE CAVEAT: this boundary is computed in UTC, but sales are bucketed in the shop's
+ * local zone (see aggregateSales/monthKeyInTz). For a shop WEST of UTC (e.g. this one,
+ * America/Los_Angeles) the UTC first-of-month is EARLIER than the shop-local one, so the
+ * pull opens a few hours early and merely OVER-pulls — the extra orders belong to the
+ * month before `since` and are never written (they fall outside monthKeys). For a shop
+ * EAST of UTC it would open LATE and UNDER-pull, dropping the previous month's first few
+ * shop-local hours. Safe as-is for a Pacific shop; if the store ever moves east of UTC,
+ * derive this from the shop tz (first shop-local instant of the previous month → UTC).
  */
 export function monthlyRefreshSince(now: Date): Date {
   const firstOfPrevMonth = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1);
