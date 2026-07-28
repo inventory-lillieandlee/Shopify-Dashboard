@@ -1,5 +1,4 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/auth/require-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,10 +6,8 @@ export const dynamic = "force-dynamic";
 // Remove a tracked product: sets active=FALSE — NEVER DELETE. alert_log + monthly_sales +
 // projections rows are retained (Phase 4 needs alert history). Once active=false the product
 // drops from getInventoryRows (active=true) and readRecomputeInputs (active=true) → gone from
-// the dashboard and from alerting. GATED (requireAdmin), service-role write.
+// the dashboard and from alerting. OPEN — the dashboard is open (no auth gate); service-role write.
 export async function POST(req: Request) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.response;
 
   const b = (await req.json().catch(() => null)) as { id?: unknown } | null;
   const id = typeof b?.id === "string" ? b.id : null;

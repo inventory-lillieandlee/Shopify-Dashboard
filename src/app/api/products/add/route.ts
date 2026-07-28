@@ -1,5 +1,4 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/auth/require-admin";
 import { isTrackableCategory, isMultiVariant, resolveAutoActivate, monthlySalesIsCurrent, TRACKABLE_CATEGORIES } from "@/lib/products/rules";
 import { monthIndex, monthKeyFromIndex, shopMonth } from "@/lib/shopify/backfill";
 import { fetchShopTimeZone } from "@/lib/shopify/shop";
@@ -7,7 +6,7 @@ import { fetchShopTimeZone } from "@/lib/shopify/shop";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Add a tracked product from the catalog. GATED (requireAdmin), service-role write.
+// Add a tracked product from the catalog. OPEN — the dashboard is open (no auth gate); service-role write.
 // Inserts active=FALSE + history_status='pending' (the backfill-worker cron picks it up —
 // NO inline backfill, NO fire-and-forget), lead_time_provisional=true, and lead/safety READ
 // from category_thresholds for the operator-picked category (never hardcoded). Re-adding a
@@ -20,8 +19,6 @@ export const dynamic = "force-dynamic";
 // fresh add. Multi-variant products are rejected. `auto_activate` defaults true (real add →
 // appears when ready); the verification run passes false to bound exposure.
 export async function POST(req: Request) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.response;
 
   let body: unknown;
   try {
