@@ -109,7 +109,7 @@ export async function runBackfillTick(
   admin: SupabaseClient,
   now: Date,
   timeZone: string,
-  opts: { leaseMs: number; softDeadlineMs: number },
+  opts: { leaseMs: number; softDeadlineMs: number; maxChunks?: number },
 ): Promise<BackfillTickResult> {
   const startedAt = Date.now();
   const nowIso = now.toISOString();
@@ -146,7 +146,7 @@ export async function runBackfillTick(
       const target = shopMonth(now, timeZone);
       const acq = await admin
         .from("products")
-        .update({ history_status: "building", history_cursor: floor, history_target_month: target, history_lease_until: leaseUntil, history_error: null })
+        .update({ history_status: "building", history_cursor: floor, history_target_month: target, history_lease_until: leaseUntil, history_error: null, history_attempts: 0 })
         .eq("id", pid)
         .eq("history_status", "pending")
         .select(CLAIM_COLS)
@@ -165,8 +165,10 @@ export async function runBackfillTick(
 
   try {
     if (variantId == null) throw new PermanentError("product has no shopify_variant_id");
+    const maxChunks = opts.maxChunks ?? Number.POSITIVE_INFINITY;
+    let chunks = 0;
 
-    while (Date.now() - startedAt < opts.softDeadlineMs) {
+    while (Date.now() - startedAt < opts.softDeadlineMs && chunks < maxChunks) {
       if (cursor !== DEMAND_STEP) {
         const orders = await fetchMonthOrders(cursor);
         const asOf = new Date(Date.UTC(Number(cursor.slice(0, 4)), Number(cursor.slice(5, 7)) - 1, 15, 12));
@@ -178,7 +180,10 @@ export async function runBackfillTick(
         if (up.error) throw new Error(`monthly_sales upsert: ${up.error.message}`);
         processed.push(cursor);
         cursor = advanceCursor(cursor, target);
-        await admin.from("products").update({ history_cursor: cursor }).eq("id", productId); // persist after each chunk
+        // persist cursor + reset attempts: a successful chunk clears prior transient count,
+        // so scattered 429/5xx across months can't accumulate to a false 'failed'.
+        await admin.from("products").update({ history_cursor: cursor, history_attempts: 0 }).eq("id", productId);
+        chunks += 1;
       } else {
         const orders = await fetchTrailingOrders(now);
         const { units30, units7 } = computeDemand(sellableOrders(orders), now);
