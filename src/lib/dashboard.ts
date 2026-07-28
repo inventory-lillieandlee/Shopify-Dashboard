@@ -9,6 +9,7 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   cbd: "CBD",
   treats: "Treats",
   salmon_oil: "Salmon Oil",
+  human_supplement: "Human Supplement",
 };
 
 export const ALERT_LABELS: Record<AlertLevel, string> = {

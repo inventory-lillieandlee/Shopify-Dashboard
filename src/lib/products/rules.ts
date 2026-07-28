@@ -2,9 +2,21 @@
 // behaviours are unit-testable without an HTTP/DB/Shopify harness. The routes/worker call
 // these; the month-window + cursor helpers live in shopify/backfill.ts (also unit-tested).
 
-/** The four categories the dashboard tracks (thresholds + lead-time defaults exist for these). */
-export const TRACKABLE_CATEGORIES = ["supplement_chews", "cbd", "treats", "salmon_oil"] as const;
-export type TrackableCategory = (typeof TRACKABLE_CATEGORIES)[number];
+import { CATEGORIES, type Category } from "../data/types.ts";
+
+// Categories that must NOT be offered for NEW products even though the dashboard still
+// displays them (e.g. a retired line kept for history). Empty today. Deriving TRACKABLE from
+// CATEGORIES (minus this list) keeps ONE source of truth: a newly added category is trackable
+// BY DEFAULT and can never silently miss the picker, while retiring a category stays
+// expressible without a second hardcoded category list.
+const NON_TRACKABLE_CATEGORIES: readonly Category[] = [];
+
+/** Categories a NEW product can be added under (picker options + add-route validation):
+ *  CATEGORIES minus the exclusion list above. */
+export const TRACKABLE_CATEGORIES: readonly Category[] = CATEGORIES.filter(
+  (c) => !NON_TRACKABLE_CATEGORIES.includes(c),
+);
+export type TrackableCategory = Category;
 
 /** Add requires an explicit, valid category pick (never inferred from the title). */
 export function isTrackableCategory(c: string): c is TrackableCategory {

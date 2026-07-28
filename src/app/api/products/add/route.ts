@@ -1,6 +1,6 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { isTrackableCategory, isMultiVariant, resolveAutoActivate, monthlySalesIsCurrent } from "@/lib/products/rules";
+import { isTrackableCategory, isMultiVariant, resolveAutoActivate, monthlySalesIsCurrent, TRACKABLE_CATEGORIES } from "@/lib/products/rules";
 import { monthIndex, monthKeyFromIndex, shopMonth } from "@/lib/shopify/backfill";
 import { fetchShopTimeZone } from "@/lib/shopify/shop";
 
@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   const category = String(b.category ?? "");
   if (!isTrackableCategory(category)) {
     return Response.json(
-      { error: "category must be one of supplement_chews, cbd, treats, salmon_oil (explicit pick required — never inferred from the title)" },
+      { error: `category must be one of ${TRACKABLE_CATEGORIES.join(", ")} (explicit pick required — never inferred from the title)` },
       { status: 400 },
     );
   }
