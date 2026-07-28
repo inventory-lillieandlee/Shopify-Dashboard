@@ -1,6 +1,7 @@
 import { getInventoryRows } from "@/lib/data/inventory";
 import { getMonthlySales, getCurrentMonthSalesUpdatedAt } from "@/lib/data/monthly-sales";
 import { getAvailableCatalog, getAddingProducts } from "@/lib/data/catalog";
+import { createServerComponentClient } from "@/lib/supabase/server";
 import { historyStartMonth } from "@/lib/sales";
 import {
   deriveSummary,
@@ -55,14 +56,27 @@ export default async function Page({
 
   const now = new Date();
   const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+
+  // Admin controls (Add product / Remove / Refresh catalog / Adding strip) render ONLY for a
+  // signed-in admin. Resolve the session server-side — no env flag; app_metadata.role is
+  // server-controlled (never user_metadata). With no login flow live yet this is always
+  // false, so the public dashboard is identical to today. The write ROUTES keep their own
+  // requireAdmin guards regardless of what renders here.
+  const authClient = await createServerComponentClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+  const isAdmin = user?.app_metadata?.role === "admin";
+
   // Parallel reads through the seam — no client-side waterfall for the popup chart.
-  const [all, sales, salesUpdatedAt, catalog, adding] = await Promise.all([
+  const [all, sales, salesUpdatedAt] = await Promise.all([
     getInventoryRows(),
     getMonthlySales(),
     getCurrentMonthSalesUpdatedAt(currentMonth),
-    getAvailableCatalog(),
-    getAddingProducts(),
   ]);
+  // Catalog + adding-strip feed admin-only UI — skip the reads entirely for the public.
+  const catalog = isAdmin ? await getAvailableCatalog() : [];
+  const adding = isAdmin ? await getAddingProducts() : [];
   const historyStart = historyStartMonth(sales); // earliest tracked month, derived from data
   const summary = deriveSummary(all);
   const queue = reorderQueue(all);
@@ -97,17 +111,17 @@ export default async function Page({
                 sort={sort}
                 dir={dir}
               />
-              <ProductPicker catalog={catalog} />
+              {isAdmin && <ProductPicker catalog={catalog} />}
             </div>
           </div>
-          <AddingStrip rows={adding} />
+          {isAdmin && <AddingStrip rows={adding} />}
           <div
             className={cn(
               surfacePanel,
               "animate-in overflow-hidden duration-500 fade-in slide-in-from-bottom-2",
             )}
           >
-            <InventoryTable rows={rows} sort={sort} dir={dir} sales={sales} currentMonth={currentMonth} historyStart={historyStart} salesUpdatedAt={salesUpdatedAt} />
+            <InventoryTable rows={rows} sort={sort} dir={dir} sales={sales} currentMonth={currentMonth} historyStart={historyStart} salesUpdatedAt={salesUpdatedAt} isAdmin={isAdmin} />
           </div>
         </section>
 

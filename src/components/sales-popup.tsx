@@ -25,6 +25,7 @@ export function SalesPopup({
   currentMonth,
   historyStart,
   salesUpdatedAt,
+  isAdmin = false,
   onClose,
 }: {
   row: InventoryRow;
@@ -32,6 +33,7 @@ export function SalesPopup({
   currentMonth: string;
   historyStart: string | null;
   salesUpdatedAt: string | null;
+  isAdmin?: boolean;
   onClose: () => void;
 }) {
   const [months, setMonths] = useState<Range>(6);
@@ -226,15 +228,17 @@ export function SalesPopup({
             >
               View full details →
             </Link>
-            <button
-              type="button"
-              onClick={() => setConfirmRemove(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-            >
-              <Trash2 className="size-3.5" /> Remove
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setConfirmRemove(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+              >
+                <Trash2 className="size-3.5" /> Remove
+              </button>
+            )}
           </div>
-          {removeErr && <p className="mt-2 text-xs text-red-700 dark:text-red-400">{removeErr}</p>}
+          {isAdmin && removeErr && <p className="mt-2 text-xs text-red-700 dark:text-red-400">{removeErr}</p>}
         </div>
       </div>
 
