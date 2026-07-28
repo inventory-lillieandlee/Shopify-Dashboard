@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
+import { UserMenu } from "@/components/user-menu";
 
 export function SiteHeader() {
   return (
@@ -34,6 +35,7 @@ export function SiteHeader() {
       </div>
       <div className="flex items-center gap-3 self-end sm:self-auto">
         <span className="hidden text-xs text-muted-foreground sm:inline">19 SKUs · live</span>
+        <UserMenu />
         <Link
           href="/settings"
           aria-label="Settings"

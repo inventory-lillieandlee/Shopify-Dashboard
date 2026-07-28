@@ -21,6 +21,9 @@ next-env.d.ts
 .env.local
 .env*.local
 
+# One-off admin provisioning script — stays local (V0 auth-restore), never committed
+/scripts/provision-admin.ts
+
 # Logs
 *.log
 npm-debug.log*
