@@ -17,9 +17,14 @@ export type AdminGate = { ok: true; userId: string; email: string | null } | { o
  * separate task. Routes that also run on a cron accept the CRON_SECRET bearer as an
  * alternate credential (see /api/catalog/sync).
  */
-export async function requireAdmin(): Promise<AdminGate> {
+export async function requireAdmin(req?: Request): Promise<AdminGate> {
   const supabase = await createServerComponentClient();
-  const { data, error } = await supabase.auth.getUser();
+  // Prefer an Authorization: Bearer <access_token> (API clients + tests); otherwise fall
+  // back to the cookie session (browser). Both are fully validated by getUser() against
+  // the auth server — this is an additional credential path, NOT a bypass of the check.
+  const authz = req?.headers.get("authorization") ?? "";
+  const bearer = authz.startsWith("Bearer ") ? authz.slice(7).trim() : null;
+  const { data, error } = bearer ? await supabase.auth.getUser(bearer) : await supabase.auth.getUser();
   const user = data?.user;
   if (error || !user) {
     return { ok: false, response: Response.json({ error: "unauthorized" }, { status: 401 }) };

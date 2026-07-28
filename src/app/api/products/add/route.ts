@@ -7,8 +7,8 @@ export const dynamic = "force-dynamic";
 // role writes only, no open access. Body (category pick, provisional lead from
 // category_thresholds, history_status='pending', multi-variant reject, enqueue backfill)
 // lands in Task 3/6.
-export async function POST() {
-  const gate = await requireAdmin();
+export async function POST(req: Request) {
+  const gate = await requireAdmin(req);
   if (!gate.ok) return gate.response;
   return Response.json({ error: "not yet implemented" }, { status: 501 });
 }

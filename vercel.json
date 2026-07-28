@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/catalog/sync",
-      "schedule": "0 * * * *"
+      "schedule": "30 * * * *"
     }
   ]
 }

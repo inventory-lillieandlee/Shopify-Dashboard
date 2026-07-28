@@ -22,7 +22,7 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   const isCron = Boolean(secret) && req.headers.get("authorization") === `Bearer ${secret}`;
   if (!isCron) {
-    const gate = await requireAdmin();
+    const gate = await requireAdmin(req);
     if (!gate.ok) return gate.response;
   }
   try {
