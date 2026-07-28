@@ -3,11 +3,12 @@ import { createServerComponentClient } from "@/lib/supabase/server";
 import { adminClientOrError } from "@/lib/supabase/admin";
 import { readRecomputeInputs, computeAll, persistProjections } from "@/lib/projections/recompute";
 import { loadProjectionSettings } from "@/lib/config/projection-config";
+import { CATEGORIES } from "@/lib/data/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const CATS = new Set(["supplement_chews", "cbd", "treats", "salmon_oil"]);
+const CATS = new Set<string>(CATEGORIES); // derived — a new category in CATEGORIES is editable here automatically
 const numIn = (v: unknown, lo: number, hi: number): v is number =>
   typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
 const intIn = (v: unknown, lo: number, hi: number): v is number =>

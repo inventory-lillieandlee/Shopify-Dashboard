@@ -7,6 +7,7 @@ export const CATEGORIES = [
   "cbd",
   "treats",
   "salmon_oil",
+  "human_supplement",
 ] as const;
 export type Category = (typeof CATEGORIES)[number];
 

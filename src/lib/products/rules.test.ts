@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isTrackableCategory, isMultiVariant, resolveAutoActivate, backfillShouldFail, availableFromCatalog, monthlySalesIsCurrent, type CatalogRow } from "./rules.ts";
 
-test("isTrackableCategory: the 4 known categories only; never inferred", () => {
-  for (const c of ["supplement_chews", "cbd", "treats", "salmon_oil"]) assert.equal(isTrackableCategory(c), true);
-  for (const c of ["", "apparel", "CBD", "widgets", "supplement"]) assert.equal(isTrackableCategory(c), false);
+test("isTrackableCategory: the known categories only; never inferred", () => {
+  for (const c of ["supplement_chews", "cbd", "treats", "salmon_oil", "human_supplement"]) assert.equal(isTrackableCategory(c), true);
+  for (const c of ["", "apparel", "CBD", "widgets", "supplement", "human"]) assert.equal(isTrackableCategory(c), false);
 });
 
 test("isMultiVariant: >1 variant is rejected", () => {
