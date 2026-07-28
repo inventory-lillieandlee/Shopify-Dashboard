@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { adminClientOrError } from "@/lib/supabase/admin";
+import { requireAdmin } from "@/lib/auth/require-admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,8 +8,12 @@ export const dynamic = "force-dynamic";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LEVELS = new Set(["yellow", "red", "critical"]);
 
-// Manage alert recipients via the service-role client. Open — no login/admin gate.
-export async function GET() {
+// Manage alert recipients via the service-role client. ADMIN-GATED (requireAdmin,
+// app_metadata) on EVERY method: the POST/DELETE writes bypass RLS, and GET returns
+// recipient email addresses (PII) — neither belongs on a publicly reachable endpoint.
+export async function GET(req: Request) {
+  const gate = await requireAdmin(req);
+  if (!gate.ok) return gate.response;
   const { admin, error } = adminClientOrError();
   if (error) return error;
   try {
@@ -25,6 +30,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const gate = await requireAdmin(req);
+  if (!gate.ok) return gate.response;
   const { admin, error } = adminClientOrError();
   if (error) return error;
   let body: unknown;
@@ -54,6 +61,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const gate = await requireAdmin(req);
+  if (!gate.ok) return gate.response;
   const { admin, error } = adminClientOrError();
   if (error) return error;
   const id = new URL(req.url).searchParams.get("id");
