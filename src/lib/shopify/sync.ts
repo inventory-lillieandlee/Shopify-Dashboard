@@ -2,46 +2,10 @@
 // service-role admin client. Used by the cron routes.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchOrdersSince } from "./orders";
-import { computeDemand } from "./demand";
 import { fetchInventoryLevels } from "./inventory";
 
-/**
- * Daily demand sync: pull the last 30 days of orders, compute net units sold per
- * variant, map to our SKUs, and upsert sku_demand. Heavy (high order volume) — runs
- * on its own daily cron, not the 6h path.
- */
-export async function syncDemand(
-  admin: SupabaseClient,
-  now: Date,
-): Promise<{ updated: number; orders: number }> {
-  const { data, error } = await admin
-    .from("products")
-    .select("id, shopify_variant_id")
-    .eq("active", true);
-  if (error) throw new Error(`products: ${error.message}`);
-  const products = (data ?? []) as { id: string; shopify_variant_id: number | null }[];
-
-  const since = new Date(now.getTime() - 30 * 86_400_000).toISOString();
-  const orders = await fetchOrdersSince(since);
-  const { units30, units7 } = computeDemand(orders, now);
-
-  const rows = products
-    .filter((p) => p.shopify_variant_id != null)
-    .map((p) => {
-      const v = Number(p.shopify_variant_id);
-      return {
-        product_id: p.id,
-        units_sold_30d: Math.max(units30.get(v) ?? 0, 0),
-        units_sold_7d: Math.max(units7.get(v) ?? 0, 0),
-        computed_at: now.toISOString(),
-      };
-    });
-
-  const { error: upErr } = await admin.from("sku_demand").upsert(rows, { onConflict: "product_id" });
-  if (upErr) throw new Error(`sku_demand upsert: ${upErr.message}`);
-  return { updated: rows.length, orders: orders.length };
-}
+// NOTE: demand + monthly-sales writers moved to ./sales-sync.ts (one code path shared
+// by the cron and the backfill). This module keeps the inventory refresh.
 
 /**
  * Cheap inventory refresh (one GraphQL call): fresh `available` per SKU at the Shop

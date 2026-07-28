@@ -3,11 +3,11 @@
   "crons": [
     {
       "path": "/api/cron/demand-sync",
-      "schedule": "0 5 * * *"
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/cron/recompute-and-alert",
-      "schedule": "* * * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }

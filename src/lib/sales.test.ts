@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lastNMonths, monthLabel, type MonthlySale } from "./sales.ts";
+import { lastNMonths, monthLabel, historyStartMonth, trimLeadingZeroMonths, longMonthYear, isSalesStale, type MonthlySale } from "./sales.ts";
 
 const S: MonthlySale[] = [
   { month: "2026-02", units: 0 },
@@ -25,4 +25,39 @@ test("lastNMonths: fewer than n → all; n<=0 → empty", () => {
 test("monthLabel: MTD only on the current month", () => {
   assert.equal(monthLabel("2026-06", "2026-07"), "Jun");
   assert.equal(monthLabel("2026-07", "2026-07"), "Jul (MTD)");
+});
+
+test("historyStartMonth: earliest month WITH sales (leading zero months ignored)", () => {
+  assert.equal(historyStartMonth({ a: S }), "2026-04"); // Feb/Mar are 0 → not the floor
+  assert.equal(historyStartMonth({ a: S, b: [{ month: "2026-01", units: 3 }] }), "2026-01");
+  assert.equal(historyStartMonth({ a: [{ month: "2026-02", units: 0 }] }), null); // all-zero → no history
+  assert.equal(historyStartMonth({}), null);
+  assert.equal(historyStartMonth({ a: [] }), null);
+});
+
+test("trimLeadingZeroMonths: drop leading empties, keep from first sale onward", () => {
+  assert.deepEqual(trimLeadingZeroMonths(S).map((x) => x.month), ["2026-04", "2026-05", "2026-06", "2026-07"]);
+  // interior zero kept; only LEADING zeros dropped
+  const mid: MonthlySale[] = [
+    { month: "2026-05", units: 0 },
+    { month: "2026-06", units: 2 },
+    { month: "2026-07", units: 0 },
+  ];
+  assert.deepEqual(trimLeadingZeroMonths(mid).map((x) => x.month), ["2026-06", "2026-07"]);
+  // all-zero series unchanged (empty-state copy handles it)
+  assert.equal(trimLeadingZeroMonths([{ month: "2026-02", units: 0 }]).length, 1);
+});
+
+test("longMonthYear: full month + year in UTC", () => {
+  assert.equal(longMonthYear("2026-02"), "February 2026");
+  assert.equal(longMonthYear("2026-12"), "December 2026");
+});
+
+test("isSalesStale: true only past the 6h threshold; null is never stale", () => {
+  const now = Date.parse("2026-07-28T12:00:00Z");
+  assert.equal(isSalesStale(null, now), false); // nothing to compare
+  assert.equal(isSalesStale("2026-07-28T11:00:00Z", now), false); // 1h old
+  assert.equal(isSalesStale("2026-07-28T05:59:00Z", now), true); // 6h01m old
+  assert.equal(isSalesStale("2026-07-28T06:01:00Z", now), false); // 5h59m old — just under
+  assert.equal(isSalesStale("2026-07-27T12:00:00Z", now), true); // 24h old
 });

@@ -27,3 +27,28 @@ export async function getMonthlySalesWith(
   }
   return out;
 }
+
+/**
+ * When the CURRENT-month sales rows were last synced — the newest
+ * monthly_sales.updated_at for `${currentMonth}-01`. The demand-sync cron stamps every
+ * current-month row each run, so this is the chart's true freshness. DELIBERATELY not
+ * the inventory snapshot_at (that field is always fresh on its own cron and is exactly
+ * what made a stale chart look trustworthy). Null when no current-month row exists yet.
+ */
+export async function getCurrentMonthSalesUpdatedAt(currentMonth: string): Promise<string | null> {
+  return getCurrentMonthSalesUpdatedAtWith(await createServerComponentClient(), currentMonth);
+}
+
+export async function getCurrentMonthSalesUpdatedAtWith(
+  client: SupabaseClient,
+  currentMonth: string,
+): Promise<string | null> {
+  const { data, error } = await client
+    .from("monthly_sales")
+    .select("updated_at")
+    .eq("month", `${currentMonth}-01`)
+    .order("updated_at", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(`monthly_sales freshness: ${error.message}`);
+  return (data?.[0] as { updated_at: string } | undefined)?.updated_at ?? null;
+}

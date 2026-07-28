@@ -6,7 +6,8 @@
 // demand. Writes NOTHING. Reuses the pure aggregateSales + engine.
 import { readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
-import { aggregateSales } from "../src/lib/shopify/demand.ts";
+import { aggregateSales, sellableOrders } from "../src/lib/shopify/demand.ts";
+import { syncMonthlySales, syncDemand } from "../src/lib/shopify/sales-sync.ts";
 import { computeProjection } from "../src/lib/projections/engine.ts";
 import { loadProjectionSettings } from "../src/lib/config/projection-config.ts";
 import { readRecomputeInputs, computeAll, persistProjections } from "../src/lib/projections/recompute.ts";
@@ -56,6 +57,19 @@ async function shopToken(): Promise<string> {
   if (!res.ok) throw new Error(`token grant ${res.status}`);
   return (await res.json()).access_token;
 }
+// Shop IANA timezone for shop-local month bucketing (falls back to UTC).
+async function shopTimeZone(): Promise<string> {
+  try {
+    const token = await shopToken();
+    const res = await fetchRetry(`${store}/admin/api/${ver}/shop.json?fields=iana_timezone`, {
+      headers: { "X-Shopify-Access-Token": token },
+    });
+    if (!res.ok) return "UTC";
+    return (await res.json())?.shop?.iana_timezone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 function nextLink(link: string | null): string | null {
   if (!link) return null;
   for (const p of link.split(",")) {
@@ -70,12 +84,13 @@ type Order = {
   id: number;
   created_at: string;
   cancelled_at: string | null;
+  test?: boolean;
   line_items: { id: number; variant_id: number | null; quantity: number }[];
   refunds: { refund_line_items: { line_item_id: number; quantity: number }[] }[];
 };
 async function fetchOrders(sinceIso: string, maxPages = 400): Promise<{ orders: Order[]; pages: number }> {
   const token = await shopToken();
-  const fields = "id,created_at,cancelled_at,line_items,refunds";
+  const fields = "id,created_at,cancelled_at,test,line_items,refunds";
   let url: string | null =
     `${store}/admin/api/${ver}/orders.json?status=any&limit=250` +
     `&created_at_min=${encodeURIComponent(sinceIso)}&fields=${encodeURIComponent(fields)}`;
@@ -113,7 +128,8 @@ async function main() {
   console.log(`now=${now.toISOString()}  since=${since.toISOString()}  api=${ver}`);
 
   const { orders, pages } = await fetchOrders(since.toISOString());
-  console.log(`pulled ${orders.length} orders across ${pages} page(s)\n`);
+  const tz = await shopTimeZone();
+  console.log(`pulled ${orders.length} orders across ${pages} page(s); shop tz=${tz}\n`);
 
   // ── refund / cancellation accounting ──
   let cancelled = 0, cancelledUnrefunded = 0, cancelledUnrefundedUnits = 0, refundedOrders = 0;
@@ -129,8 +145,8 @@ async function main() {
     }
   }
 
-  // ── aggregate (pure, nets refunds to the SALE month/window) ──
-  const agg = aggregateSales(orders as never, now, 6);
+  // ── aggregate (cancelled+test excluded, nets refunds to the SALE month/window) ──
+  const agg = aggregateSales(sellableOrders(orders as never), now, 6, tz);
 
   // ── DB reads (service-role, read-only) ──
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -235,36 +251,13 @@ async function main() {
   const { data: beforeProj } = await admin.from("projections").select("product_id, alert_level");
   const beforeTier = new Map((beforeProj ?? []).map((p) => [p.product_id, p.alert_level as string]));
 
-  // demand aggregation EXCLUDING fully-cancelled orders (correct; ~5 units total)
-  const clean = (orders as unknown as Order[]).filter((o) => !o.cancelled_at);
-  const aggW = aggregateSales(clean as never, now, 6);
-  const varToProduct = new Map((products ?? []).map((p) => [Number(p.shopify_variant_id), p]));
-
-  // 1) upsert monthly_sales (6 months incl. empty Feb/Mar), net of refunds, clamped ≥0
-  const msRows: { product_id: string; month: string; units_sold: number }[] = [];
-  for (const p of products ?? []) {
-    const m = aggW.monthly.get(Number(p.shopify_variant_id)) ?? new Map<string, number>();
-    for (const k of aggW.monthKeys) {
-      msRows.push({ product_id: p.id, month: `${k}-01`, units_sold: Math.max(0, Math.round(m.get(k) ?? 0)) });
-    }
-  }
-  const upMs = await admin.from("monthly_sales").upsert(msRows, { onConflict: "product_id,month" });
-  if (upMs.error) throw new Error(`monthly_sales upsert: ${upMs.error.message}`);
-  console.log(`monthly_sales: upserted ${msRows.length} rows (${(products ?? []).length} SKUs × ${aggW.monthKeys.length} months)`);
-
-  // 2) upsert sku_demand with REAL recent run-rate (30d/7d, cancelled excluded)
-  const sdRows = (products ?? []).map((p) => {
-    const w = aggW.windows.get(Number(p.shopify_variant_id)) ?? { d7: 0, d30: 0, d60: 0, d90: 0 };
-    return {
-      product_id: p.id,
-      units_sold_30d: Math.max(0, Math.round(w.d30)),
-      units_sold_7d: Math.max(0, Math.round(w.d7)),
-      computed_at: now.toISOString(),
-    };
-  });
-  const upSd = await admin.from("sku_demand").upsert(sdRows, { onConflict: "product_id" });
-  if (upSd.error) throw new Error(`sku_demand upsert: ${upSd.error.message}`);
-  console.log(`sku_demand: refreshed ${sdRows.length} SKUs with real 30d/7d run-rate`);
+  // monthly_sales + sku_demand via the SHARED writers (one code path with the cron;
+  // cancelled + test excluded, refunds netted). Reuse the returned aggregate below.
+  const ms = await syncMonthlySales(admin, (products ?? []) as never, orders as unknown as never, now, 6, tz);
+  const aggW = ms.aggregate;
+  console.log(`monthly_sales: upserted ${ms.upserted} rows across months ${ms.monthKeys.join(", ")}`);
+  const sd = await syncDemand(admin, (products ?? []) as never, orders as unknown as never, now);
+  console.log(`sku_demand: refreshed ${sd.updated} SKUs (trailing 30d/7d, cancelled+test excluded)`);
 
   // 3) growth: flat 1.0 (Apr→Jun is a launch ramp, not extrapolatable) — FLAGGED
   const upCfg = await admin.from("app_config").update({ growth_pct: 0 }).eq("id", true);

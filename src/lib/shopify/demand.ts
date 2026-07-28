@@ -51,6 +51,15 @@ export function clampUnits(n: number | undefined): number {
   return Math.max(n ?? 0, 0);
 }
 
+/**
+ * The orders that count as real sales — cancelled and test orders removed. Refunds
+ * are NOT filtered here (they're netted per-line inside computeDemand/aggregateSales).
+ * Single source of the exclusion rule so the cron and the backfill agree exactly.
+ */
+export function sellableOrders(orders: ShopifyOrder[]): ShopifyOrder[] {
+  return orders.filter((o) => !o.cancelled_at && o.test !== true);
+}
+
 // ── 6-month aggregation for the backfill (pure, extends the 30d/7d model) ──────
 // Per variant_id: units per calendar month (last N months) + rolling 7/30/60/90-day
 // totals, all NET of refunds. CONVENTION: a refund is netted against the SALE's month
@@ -66,7 +75,7 @@ export interface SalesWindows {
 }
 
 export interface SalesAggregate {
-  /** the N month keys ("YYYY-MM", UTC), oldest → newest */
+  /** the N month keys ("YYYY-MM", in the caller's timeZone), oldest → newest */
   monthKeys: string[];
   /** variant_id -> monthKey -> net units */
   monthly: Map<number, Map<string, number>>;
@@ -74,16 +83,35 @@ export interface SalesAggregate {
   windows: Map<number, SalesWindows>;
 }
 
-function monthKeyOf(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+/**
+ * The calendar month an instant falls in, in the SHOP's local timezone → "YYYY-MM".
+ * Shopify `created_at` is an absolute instant; the month a sale belongs to is the
+ * shop's local month, not UTC's. e.g. 2026-06-30 23:30 America/Los_Angeles is
+ * 2026-07-01 06:30Z — it belongs to June. Intl resolves the offset and DST for the
+ * given IANA zone, so nothing is hardcoded. `timeZone` defaults to "UTC" (the old
+ * behaviour) so callers that don't care are unaffected.
+ */
+function monthKeyInTz(d: Date, timeZone: string): string {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "2-digit" }).formatToParts(d);
+  const y = parts.find((p) => p.type === "year")!.value;
+  const m = parts.find((p) => p.type === "month")!.value;
+  return `${y}-${m}`;
 }
 
-export function aggregateSales(orders: ShopifyOrder[], now: Date, monthsBack = 6): SalesAggregate {
+export function aggregateSales(
+  orders: ShopifyOrder[],
+  now: Date,
+  monthsBack = 6,
+  timeZone = "UTC",
+): SalesAggregate {
+  // Build the month keys in the shop's local calendar so "current month" is the shop's
+  // current month and the keys line up with monthKeyInTz. Integer month arithmetic
+  // avoids Date rollover surprises across year boundaries.
+  const [ny, nm] = monthKeyInTz(now, timeZone).split("-").map(Number); // nm: 1-12
   const monthKeys: string[] = [];
   for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    monthKeys.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+    const t = ny * 12 + (nm - 1) - i;
+    monthKeys.push(`${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`);
   }
   const monthSet = new Set(monthKeys);
   const cut7 = now.getTime() - 7 * 86_400_000;
@@ -108,8 +136,9 @@ export function aggregateSales(orders: ShopifyOrder[], now: Date, monthsBack = 6
   };
 
   for (const order of orders) {
-    const t = new Date(order.created_at).getTime();
-    const key = monthKeyOf(order.created_at);
+    const od = new Date(order.created_at);
+    const t = od.getTime();
+    const key = monthKeyInTz(od, timeZone);
     const inMonth = monthSet.has(key);
     const lineItemVariant = new Map<number, number>();
     for (const li of order.line_items) {
