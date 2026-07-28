@@ -1,7 +1,7 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { isTrackableCategory, isMultiVariant, resolveAutoActivate, monthlySalesIsCurrent } from "@/lib/products/rules";
-import { DEMAND_STEP, monthIndex, monthKeyFromIndex, shopMonth } from "@/lib/shopify/backfill";
+import { monthIndex, monthKeyFromIndex, shopMonth } from "@/lib/shopify/backfill";
 import { fetchShopTimeZone } from "@/lib/shopify/shop";
 
 export const runtime = "nodejs";
@@ -13,11 +13,12 @@ export const dynamic = "force-dynamic";
 // from category_thresholds for the operator-picked category (never hardcoded). Re-adding a
 // previously removed product UPDATES the existing row (matched on shopify_variant_id) —
 // never a duplicate. RE-ADD BACKFILL POLICY: reuse the retained monthly_sales when it is
-// still current (newest stored month is the current OR previous month) — skip straight to
-// the terminal demand chunk (cursor=DEMAND_STEP) so the worker only refreshes sku_demand and
-// leaves monthly_sales intact; otherwise re-enqueue a full sweep like a fresh add. Multi-
-// variant products are rejected. `auto_activate` defaults true (real add → appears when
-// ready); the verification run passes false to bound exposure.
+// still current (newest stored month is the current OR previous month) — start the worker's
+// cursor at the PREVIOUS shop-local month so it walks prev -> current -> demand through the
+// existing chunk loop (two bounded month pulls; refreshes the recent months + sku_demand),
+// never re-pulling the dense historical months; otherwise re-enqueue a full sweep like a
+// fresh add. Multi-variant products are rejected. `auto_activate` defaults true (real add →
+// appears when ready); the verification run passes false to bound exposure.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (!gate.ok) return gate.response;
@@ -100,9 +101,10 @@ export async function POST(req: Request) {
     const existingId = existing.data?.[0]?.id as string | undefined;
 
     // Backfill lifecycle. Fresh add → full sweep (history_status='pending'; the worker sets
-    // cursor/target/floor at claim). Re-add → REUSE the retained monthly_sales when its newest
-    // month is current-or-previous: jump to the demand chunk (worker only refreshes sku_demand,
-    // monthly_sales untouched). Stale → fall through to a full re-enqueue.
+    // cursor/target/floor at claim). Re-add → REUSE the retained history when its newest month
+    // is current-or-previous: start the cursor at the PREVIOUS month so the worker walks
+    // prev → current → demand (two bounded pulls; refreshes the recent months + sku_demand,
+    // leaves the dense historical months untouched). Stale → fall through to a full re-enqueue.
     let lifecycle: { history_status: string; history_cursor: string | null; history_target_month: string | null } = {
       history_status: "pending",
       history_cursor: null,
@@ -122,7 +124,7 @@ export async function POST(req: Request) {
       if (newest.error) throw new Error(`monthly_sales lookup: ${newest.error.message}`);
       const newestMonth = newest.data?.[0]?.month ? String(newest.data[0].month).slice(0, 7) : null;
       if (monthlySalesIsCurrent(newestMonth, previousMonth)) {
-        lifecycle = { history_status: "building", history_cursor: DEMAND_STEP, history_target_month: currentMonth };
+        lifecycle = { history_status: "building", history_cursor: previousMonth, history_target_month: currentMonth };
         reused = true;
       }
     }
@@ -164,7 +166,7 @@ export async function POST(req: Request) {
       reused,
       note:
         (reused
-          ? "re-add: retained monthly_sales is current — refreshing demand only (no full backfill)"
+          ? "re-add: reusing retained history — refreshing recent months + demand (no full backfill)"
           : "queued for full history backfill; the backfill-worker cron builds monthly_sales then sets ready") +
         (autoActivate ? " + active." : " (auto_activate=false → stays inactive)."),
     });
