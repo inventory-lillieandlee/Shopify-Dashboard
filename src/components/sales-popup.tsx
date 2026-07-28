@@ -119,23 +119,28 @@ export function SalesPopup({
             </div>
           </div>
 
-          {sales.length === 0 ? (
+          {/* Key the empty state on the TRIMMED, windowed series (bars) — a product whose
+              months are all zero trims to an empty series, which must render an explicit
+              "no sales yet" state, not a chart with no bars. */}
+          {bars.length === 0 ? (
             <div className="rounded-xl border border-border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-              No sales history recorded yet.
+              No sales history yet.
             </div>
           ) : (
             <SalesChart data={bars} />
           )}
 
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {historyStart && (
-              <>
-                Sales history starts{" "}
-                <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong>.{" "}
-              </>
-            )}
-            The current month is partial (<em>MTD</em>).
-          </p>
+          {bars.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {historyStart && (
+                <>
+                  Sales history starts{" "}
+                  <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong>.{" "}
+                </>
+              )}
+              The current month is partial (<em>MTD</em>).
+            </p>
+          )}
 
           {salesStale && (
             <p

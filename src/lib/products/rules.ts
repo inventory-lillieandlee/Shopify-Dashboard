@@ -28,3 +28,33 @@ export function resolveAutoActivate(v: unknown): boolean {
 export function backfillShouldFail(permanent: boolean, attempts: number): boolean {
   return permanent || attempts > 3;
 }
+
+// ── product-picker catalog filtering (pure; the seam reader in data/catalog.ts wraps it) ──
+export interface CatalogRow {
+  variant_id: number;
+  shopify_product_id: number;
+  title: string;
+  sku: string | null;
+  variant_title: string | null;
+  status: string;
+  variant_count: number;
+}
+export interface CatalogOption extends CatalogRow {
+  selectable: boolean;
+  reason: string | null; // why disabled (multi-variant), else null
+}
+
+/**
+ * Catalog entries NOT already tracked, each flagged selectable. A variant already in
+ * `products` (active OR inactive) is excluded. Multi-variant products are DISABLED with a
+ * reason — rendered non-selectable rather than selectable-then-rejected. Sorted by title.
+ */
+export function availableFromCatalog(rows: CatalogRow[], trackedVariantIds: Set<number>): CatalogOption[] {
+  return rows
+    .filter((r) => !trackedVariantIds.has(Number(r.variant_id)))
+    .map((r) => {
+      const multi = isMultiVariant(r.variant_count ?? 1);
+      return { ...r, selectable: !multi, reason: multi ? `${r.variant_count} variants — single-variant SKUs only` : null };
+    })
+    .sort((a, b) => a.title.localeCompare(b.title));
+}
