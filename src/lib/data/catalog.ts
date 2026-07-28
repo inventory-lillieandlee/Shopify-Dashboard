@@ -14,12 +14,18 @@ export async function getAvailableCatalog(): Promise<CatalogOption[]> {
 export async function getAvailableCatalogWith(client: SupabaseClient): Promise<CatalogOption[]> {
   const [cat, prods] = await Promise.all([
     client.from("shopify_catalog").select("variant_id, shopify_product_id, title, sku, variant_title, status, variant_count"),
-    client.from("products").select("shopify_variant_id"), // tracked = active OR inactive
+    client.from("products").select("shopify_variant_id, active"), // active = tracked (hide); inactive = removed (offer, labeled)
   ]);
   if (cat.error) throw new Error(`shopify_catalog: ${cat.error.message}`);
   if (prods.error) throw new Error(`products: ${prods.error.message}`);
-  const tracked = new Set((prods.data ?? []).map((p) => Number(p.shopify_variant_id)).filter((n) => Number.isFinite(n)));
-  return availableFromCatalog((cat.data ?? []) as CatalogRow[], tracked);
+  const activeIds = new Set<number>();
+  const inactiveIds = new Set<number>();
+  for (const p of (prods.data ?? []) as { shopify_variant_id: number | null; active: boolean }[]) {
+    const v = Number(p.shopify_variant_id);
+    if (!Number.isFinite(v)) continue;
+    (p.active ? activeIds : inactiveIds).add(v);
+  }
+  return availableFromCatalog((cat.data ?? []) as CatalogRow[], activeIds, inactiveIds);
 }
 
 export interface AddingRow {

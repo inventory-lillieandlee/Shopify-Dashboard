@@ -1,6 +1,8 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
-import { isTrackableCategory, isMultiVariant, resolveAutoActivate } from "@/lib/products/rules";
+import { isTrackableCategory, isMultiVariant, resolveAutoActivate, monthlySalesIsCurrent } from "@/lib/products/rules";
+import { DEMAND_STEP, monthIndex, monthKeyFromIndex, shopMonth } from "@/lib/shopify/backfill";
+import { fetchShopTimeZone } from "@/lib/shopify/shop";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,8 +12,12 @@ export const dynamic = "force-dynamic";
 // NO inline backfill, NO fire-and-forget), lead_time_provisional=true, and lead/safety READ
 // from category_thresholds for the operator-picked category (never hardcoded). Re-adding a
 // previously removed product UPDATES the existing row (matched on shopify_variant_id) —
-// never a duplicate. Multi-variant products are rejected. `auto_activate` defaults true
-// (real add → appears when ready); the verification run passes false to bound exposure.
+// never a duplicate. RE-ADD BACKFILL POLICY: reuse the retained monthly_sales when it is
+// still current (newest stored month is the current OR previous month) — skip straight to
+// the terminal demand chunk (cursor=DEMAND_STEP) so the worker only refreshes sku_demand and
+// leaves monthly_sales intact; otherwise re-enqueue a full sweep like a fresh add. Multi-
+// variant products are rejected. `auto_activate` defaults true (real add → appears when
+// ready); the verification run passes false to bound exposure.
 export async function POST(req: Request) {
   const gate = await requireAdmin(req);
   if (!gate.ok) return gate.response;
@@ -72,7 +78,7 @@ export async function POST(req: Request) {
       return Response.json({ error: `no default lead_time_days for category ${category}` }, { status: 500 });
     }
 
-    const fields = {
+    const base = {
       shopify_product_id: entry.shopify_product_id,
       shopify_variant_id: variantId,
       inventory_item_id: entry.inventory_item_id,
@@ -81,11 +87,8 @@ export async function POST(req: Request) {
       lead_time_days: lead,
       safety_stock_days: safety,
       active: false,
-      history_status: "pending",
       lead_time_provisional: true,
       history_auto_activate: autoActivate,
-      history_cursor: null,
-      history_target_month: null,
       history_lease_until: null,
       history_error: null,
       history_attempts: 0,
@@ -95,6 +98,35 @@ export async function POST(req: Request) {
     const existing = await admin.from("products").select("id").eq("shopify_variant_id", variantId).limit(1);
     if (existing.error) throw new Error(`products lookup: ${existing.error.message}`);
     const existingId = existing.data?.[0]?.id as string | undefined;
+
+    // Backfill lifecycle. Fresh add → full sweep (history_status='pending'; the worker sets
+    // cursor/target/floor at claim). Re-add → REUSE the retained monthly_sales when its newest
+    // month is current-or-previous: jump to the demand chunk (worker only refreshes sku_demand,
+    // monthly_sales untouched). Stale → fall through to a full re-enqueue.
+    let lifecycle: { history_status: string; history_cursor: string | null; history_target_month: string | null } = {
+      history_status: "pending",
+      history_cursor: null,
+      history_target_month: null,
+    };
+    let reused = false;
+    if (existingId) {
+      const tz = await fetchShopTimeZone();
+      const currentMonth = shopMonth(new Date(), tz);
+      const previousMonth = monthKeyFromIndex(monthIndex(currentMonth) - 1);
+      const newest = await admin
+        .from("monthly_sales")
+        .select("month")
+        .eq("product_id", existingId)
+        .order("month", { ascending: false })
+        .limit(1);
+      if (newest.error) throw new Error(`monthly_sales lookup: ${newest.error.message}`);
+      const newestMonth = newest.data?.[0]?.month ? String(newest.data[0].month).slice(0, 7) : null;
+      if (monthlySalesIsCurrent(newestMonth, previousMonth)) {
+        lifecycle = { history_status: "building", history_cursor: DEMAND_STEP, history_target_month: currentMonth };
+        reused = true;
+      }
+    }
+    const fields = { ...base, ...lifecycle };
 
     let productId: string;
     let action: "inserted" | "reactivated";
@@ -125,12 +157,15 @@ export async function POST(req: Request) {
         lead_time_days: lead,
         safety_stock_days: safety,
         active: false,
-        history_status: "pending",
+        history_status: lifecycle.history_status,
         lead_time_provisional: true,
         auto_activate: autoActivate,
       },
+      reused,
       note:
-        "queued for history backfill; the backfill-worker cron builds monthly_sales then sets ready" +
+        (reused
+          ? "re-add: retained monthly_sales is current — refreshing demand only (no full backfill)"
+          : "queued for full history backfill; the backfill-worker cron builds monthly_sales then sets ready") +
         (autoActivate ? " + active." : " (auto_activate=false → stays inactive)."),
     });
   } catch (e) {

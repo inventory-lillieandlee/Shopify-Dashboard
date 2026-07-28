@@ -118,7 +118,7 @@ export function ProductPicker({ catalog }: { catalog: CatalogOption[] }) {
 
               <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
                 {filtered.length === 0 ? (
-                  <li className="p-4 text-center text-sm text-muted-foreground">No matching untracked products.</li>
+                  <li className="p-4 text-center text-sm text-muted-foreground">No matching products.</li>
                 ) : (
                   filtered.map((c) => (
                     <li key={c.variant_id}>
@@ -126,7 +126,7 @@ export function ProductPicker({ catalog }: { catalog: CatalogOption[] }) {
                         type="button"
                         disabled={!c.selectable}
                         onClick={() => setPicked(c)}
-                        title={c.reason ?? undefined}
+                        title={c.reason ?? (c.previouslyRemoved ? "Previously removed — re-adding reactivates it and reuses its retained sales history when still current." : undefined)}
                         aria-disabled={!c.selectable}
                         className={cn(
                           "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition-colors",
@@ -135,7 +135,14 @@ export function ProductPicker({ catalog }: { catalog: CatalogOption[] }) {
                         )}
                       >
                         <span className="min-w-0">
-                          <span className="block truncate font-medium">{c.title}</span>
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate font-medium">{c.title}</span>
+                            {c.previouslyRemoved && (
+                              <span className="shrink-0 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-800 uppercase dark:bg-amber-950/50 dark:text-amber-300">
+                                Previously removed
+                              </span>
+                            )}
+                          </span>
                           <span className="block truncate text-xs text-muted-foreground">
                             {c.sku ? `SKU ${c.sku}` : "no SKU"}
                             {c.status !== "active" ? ` · ${c.status}` : ""}
@@ -173,7 +180,14 @@ export function ProductPicker({ catalog }: { catalog: CatalogOption[] }) {
 
             <div className="flex items-center justify-between gap-2 border-t border-border p-4 sm:p-5">
               <span className="text-xs text-muted-foreground">
-                {picked ? <>Selected: <strong className="font-medium text-foreground">{picked.title}</strong></> : "Select a product"}
+                {picked ? (
+                  <>
+                    {picked.previouslyRemoved ? "Re-adding" : "Selected"}:{" "}
+                    <strong className="font-medium text-foreground">{picked.title}</strong>
+                  </>
+                ) : (
+                  "Select a product"
+                )}
               </span>
               <button
                 type="button"
@@ -181,7 +195,7 @@ export function ProductPicker({ catalog }: { catalog: CatalogOption[] }) {
                 disabled={busy || !picked || !category}
                 className="h-9 rounded-md bg-brand px-4 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? "Adding…" : "Add to dashboard"}
+                {busy ? (picked?.previouslyRemoved ? "Re-adding…" : "Adding…") : picked?.previouslyRemoved ? "Re-add to dashboard" : "Add to dashboard"}
               </button>
             </div>
           </div>

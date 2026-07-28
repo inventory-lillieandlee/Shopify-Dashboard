@@ -42,19 +42,40 @@ export interface CatalogRow {
 export interface CatalogOption extends CatalogRow {
   selectable: boolean;
   reason: string | null; // why disabled (multi-variant), else null
+  previouslyRemoved: boolean; // tracked before, now inactive → re-add reactivates on variant_id
 }
 
 /**
- * Catalog entries NOT already tracked, each flagged selectable. A variant already in
- * `products` (active OR inactive) is excluded. Multi-variant products are DISABLED with a
- * reason — rendered non-selectable rather than selectable-then-rejected. Sorted by title.
+ * Catalog entries the picker can offer. Only ACTIVE (already-tracked) variants are excluded;
+ * INACTIVE (previously removed) variants ARE offered, flagged `previouslyRemoved` so the UI
+ * can label them — selecting one hits the add route's reactivate-on-variant_id path (never a
+ * duplicate insert). Multi-variant products are DISABLED with a reason. Sorted by title.
  */
-export function availableFromCatalog(rows: CatalogRow[], trackedVariantIds: Set<number>): CatalogOption[] {
+export function availableFromCatalog(
+  rows: CatalogRow[],
+  activeVariantIds: Set<number>,
+  inactiveVariantIds: Set<number>,
+): CatalogOption[] {
   return rows
-    .filter((r) => !trackedVariantIds.has(Number(r.variant_id)))
+    .filter((r) => !activeVariantIds.has(Number(r.variant_id))) // active = already tracked → hide
     .map((r) => {
       const multi = isMultiVariant(r.variant_count ?? 1);
-      return { ...r, selectable: !multi, reason: multi ? `${r.variant_count} variants — single-variant SKUs only` : null };
+      return {
+        ...r,
+        selectable: !multi,
+        reason: multi ? `${r.variant_count} variants — single-variant SKUs only` : null,
+        previouslyRemoved: inactiveVariantIds.has(Number(r.variant_id)),
+      };
     })
     .sort((a, b) => a.title.localeCompare(b.title));
+}
+
+/**
+ * On re-add, is the retained monthly_sales still current enough to REUSE (skip the full
+ * month sweep)? True when the newest stored month is the current or previous month; a
+ * product removed longer ago has stale months and must re-enqueue a full backfill.
+ * "YYYY-MM" compares lexically, so >= previousMonthKey means current-or-previous.
+ */
+export function monthlySalesIsCurrent(newestMonth: string | null, previousMonthKey: string): boolean {
+  return newestMonth != null && newestMonth >= previousMonthKey;
 }
