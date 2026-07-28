@@ -63,7 +63,11 @@ async function pull(firstPath: string): Promise<ShopifyOrder[]> {
   return out;
 }
 // One shop-local month; over-pull ±1 day in UTC so tz edges are covered (aggregateSales
-// keeps only orders whose shop-local month == mk).
+// keeps only orders whose shop-local month == mk). created_at_min + created_at_max ARE
+// honored by Shopify (verified via orders/count.json). NOTE: a dense month is genuinely
+// tens of thousands of store-wide orders (this store is front-loaded — Feb/Mar hold ~49k
+// of ~67k), so a chunk can be minutes; the worker's month-chunking + the cron's spaced
+// ticks are exactly what absorb that. See the scaling-limit note at the top.
 function fetchMonthOrders(mk: string): Promise<ShopifyOrder[]> {
   const [y, m] = mk.split("-").map(Number);
   const min = new Date(Date.UTC(y, m - 1, 1) - 86_400_000).toISOString();
