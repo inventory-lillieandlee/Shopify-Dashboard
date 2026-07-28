@@ -20,6 +20,8 @@ function row(over: Partial<InventoryRow>): InventoryRow {
     reorderDate: "2999-01-01", // far future ⇒ not overdue
     spikePct: 0,
     alertLevel: "ok",
+    historyStatus: "ready",
+    leadTimeProvisional: false,
     ...over,
   };
 }

@@ -19,12 +19,13 @@ export type AdminGate = { ok: true; userId: string; email: string | null } | { o
  */
 export async function requireAdmin(req?: Request): Promise<AdminGate> {
   const supabase = await createServerComponentClient();
-  // Prefer an Authorization: Bearer <access_token> (API clients + tests); otherwise fall
-  // back to the cookie session (browser). Both are fully validated by getUser() against
-  // the auth server — this is an additional credential path, NOT a bypass of the check.
+  // Cookie session FIRST — the production/browser path. Fall back to a Bearer access token
+  // (scripts / API clients) only when there is no cookie session. Both are fully validated
+  // by getUser(); the narrower browser path takes precedence over the wider Bearer surface.
   const authz = req?.headers.get("authorization") ?? "";
   const bearer = authz.startsWith("Bearer ") ? authz.slice(7).trim() : null;
-  const { data, error } = bearer ? await supabase.auth.getUser(bearer) : await supabase.auth.getUser();
+  let { data, error } = await supabase.auth.getUser();
+  if ((error || !data?.user) && bearer) ({ data, error } = await supabase.auth.getUser(bearer));
   const user = data?.user;
   if (error || !user) {
     return { ok: false, response: Response.json({ error: "unauthorized" }, { status: 401 }) };
