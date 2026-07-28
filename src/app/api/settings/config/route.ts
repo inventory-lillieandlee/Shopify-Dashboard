@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { createServerComponentClient } from "@/lib/supabase/server";
 import { adminClientOrError } from "@/lib/supabase/admin";
-import { requireAdmin } from "@/lib/auth/require-admin";
 import { readRecomputeInputs, computeAll, persistProjections } from "@/lib/projections/recompute";
 import { loadProjectionSettings } from "@/lib/config/projection-config";
 import { CATEGORIES } from "@/lib/data/types";
@@ -43,12 +42,10 @@ export async function GET() {
   }
 }
 
-// PATCH writes via the service-role client (bypasses RLS). ADMIN-GATED (requireAdmin,
-// app_metadata) — closes the prior open-write hole. Validates, writes, then recomputes so
-// the dashboard reflects the new knobs at once. (GET stays public — config isn't secret.)
+// PATCH writes via the service-role client (bypasses RLS). OPEN — the dashboard is open (no
+// auth gate); every input below is validated + range-bounded. Validates, writes, then
+// recomputes so the dashboard reflects the new knobs at once. (GET is also public.)
 export async function PATCH(req: NextRequest) {
-  const gate = await requireAdmin(req);
-  if (!gate.ok) return gate.response;
   const { admin, error } = adminClientOrError();
   if (error) return error;
 
