@@ -13,6 +13,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { shopifyRest, shopifyRestUrl } from "./client.ts";
 import { aggregateSales, computeDemand, sellableOrders } from "./demand.ts";
 import type { ShopifyOrder } from "./orders.ts";
+import { backfillShouldFail } from "../products/rules.ts";
 
 export const DEMAND_STEP = "__demand__";
 
@@ -50,7 +51,7 @@ function parseNextLink(link: string | null): string | null {
 }
 const ORDER_FIELDS = "id,created_at,cancelled_at,test,line_items,refunds";
 
-async function pull(firstPath: string): Promise<ShopifyOrder[]> {
+async function pull(firstPath: string, deadlineMs?: number): Promise<ShopifyOrder[]> {
   let res = await shopifyRest<{ orders: ShopifyOrder[] }>(firstPath);
   const out: ShopifyOrder[] = [];
   for (;;) {
@@ -58,6 +59,14 @@ async function pull(firstPath: string): Promise<ShopifyOrder[]> {
     out.push(...(res.data?.orders ?? []));
     const next = parseNextLink(res.link);
     if (!next) break;
+    // PROGRESS GUARD (option b): a chunk that can't finish within the tick's soft deadline
+    // aborts HERE rather than being hard-killed mid-pull and silently re-pulled forever. The
+    // throw is handled as a transient (history_attempts++), so a genuinely-too-large window
+    // fails LOUDLY after >3 ticks instead of spinning. (Chosen over per-page cursor+partial-
+    // sum resume, which needs 2 new columns + cross-page refund accumulation — see report.)
+    if (deadlineMs !== undefined && Date.now() > deadlineMs) {
+      throw new Error("chunk exceeded soft deadline (window too large to complete in one tick)");
+    }
     res = await shopifyRestUrl<{ orders: ShopifyOrder[] }>(next);
   }
   return out;
@@ -68,17 +77,18 @@ async function pull(firstPath: string): Promise<ShopifyOrder[]> {
 // tens of thousands of store-wide orders (this store is front-loaded — Feb/Mar hold ~49k
 // of ~67k), so a chunk can be minutes; the worker's month-chunking + the cron's spaced
 // ticks are exactly what absorb that. See the scaling-limit note at the top.
-function fetchMonthOrders(mk: string): Promise<ShopifyOrder[]> {
+function fetchMonthOrders(mk: string, deadlineMs?: number): Promise<ShopifyOrder[]> {
   const [y, m] = mk.split("-").map(Number);
   const min = new Date(Date.UTC(y, m - 1, 1) - 86_400_000).toISOString();
   const max = new Date(Date.UTC(y, m, 1) + 86_400_000).toISOString();
   return pull(
     `orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(min)}&created_at_max=${encodeURIComponent(max)}&fields=${encodeURIComponent(ORDER_FIELDS)}`,
+    deadlineMs,
   );
 }
-function fetchTrailingOrders(now: Date): Promise<ShopifyOrder[]> {
+function fetchTrailingOrders(now: Date, deadlineMs?: number): Promise<ShopifyOrder[]> {
   const min = new Date(now.getTime() - 31 * 86_400_000).toISOString();
-  return pull(`orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(min)}&fields=${encodeURIComponent(ORDER_FIELDS)}`);
+  return pull(`orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(min)}&fields=${encodeURIComponent(ORDER_FIELDS)}`, deadlineMs);
 }
 
 class PermanentError extends Error {}
@@ -170,11 +180,12 @@ export async function runBackfillTick(
   try {
     if (variantId == null) throw new PermanentError("product has no shopify_variant_id");
     const maxChunks = opts.maxChunks ?? Number.POSITIVE_INFINITY;
+    const deadlineMs = startedAt + opts.softDeadlineMs; // pulls abort here (progress guard)
     let chunks = 0;
 
     while (Date.now() - startedAt < opts.softDeadlineMs && chunks < maxChunks) {
       if (cursor !== DEMAND_STEP) {
-        const orders = await fetchMonthOrders(cursor);
+        const orders = await fetchMonthOrders(cursor, deadlineMs);
         const asOf = new Date(Date.UTC(Number(cursor.slice(0, 4)), Number(cursor.slice(5, 7)) - 1, 15, 12));
         const agg = aggregateSales(sellableOrders(orders), asOf, 1, timeZone); // monthKeys=[cursor]
         const units = Math.max(0, Math.round(agg.monthly.get(variantId)?.get(cursor) ?? 0));
@@ -189,7 +200,7 @@ export async function runBackfillTick(
         await admin.from("products").update({ history_cursor: cursor, history_attempts: 0 }).eq("id", productId);
         chunks += 1;
       } else {
-        const orders = await fetchTrailingOrders(now);
+        const orders = await fetchTrailingOrders(now, deadlineMs);
         const { units30, units7 } = computeDemand(sellableOrders(orders), now);
         const up = await admin.from("sku_demand").upsert(
           { product_id: productId, units_sold_30d: Math.max(0, units30.get(variantId) ?? 0), units_sold_7d: Math.max(0, units7.get(variantId) ?? 0), computed_at: nowIso },
@@ -208,7 +219,7 @@ export async function runBackfillTick(
     return { productId, processed, cursor, status: "building" };
   } catch (e) {
     const attempts = (claim.history_attempts ?? 0) + 1;
-    if (e instanceof PermanentError || attempts > 3) {
+    if (backfillShouldFail(e instanceof PermanentError, attempts)) {
       await admin
         .from("products")
         .update({ history_status: "failed", history_error: String(e).slice(0, 500), history_lease_until: null, history_attempts: attempts })

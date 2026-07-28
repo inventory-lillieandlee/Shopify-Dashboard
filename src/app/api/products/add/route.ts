@@ -1,10 +1,9 @@
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/auth/require-admin";
+import { isTrackableCategory, isMultiVariant, resolveAutoActivate } from "@/lib/products/rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const CATEGORIES = new Set(["supplement_chews", "cbd", "treats", "salmon_oil"]);
 
 // Add a tracked product from the catalog. GATED (requireAdmin), service-role write.
 // Inserts active=FALSE + history_status='pending' (the backfill-worker cron picks it up —
@@ -29,13 +28,13 @@ export async function POST(req: Request) {
     return Response.json({ error: "variant_id (number) required" }, { status: 400 });
   }
   const category = String(b.category ?? "");
-  if (!CATEGORIES.has(category)) {
+  if (!isTrackableCategory(category)) {
     return Response.json(
       { error: "category must be one of supplement_chews, cbd, treats, salmon_oil (explicit pick required — never inferred from the title)" },
       { status: 400 },
     );
   }
-  const autoActivate = b.auto_activate === undefined ? true : b.auto_activate === true;
+  const autoActivate = resolveAutoActivate(b.auto_activate);
 
   try {
     const admin = createSupabaseAdminClient();
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
     if (!entry) {
       return Response.json({ error: "variant not found in catalog — refresh the catalog and retry" }, { status: 404 });
     }
-    if ((entry.variant_count ?? 1) > 1) {
+    if (isMultiVariant(entry.variant_count ?? 1)) {
       return Response.json(
         { error: `This product has ${entry.variant_count} variants; the dashboard tracks single-variant SKUs — not yet supported.` },
         { status: 409 },
