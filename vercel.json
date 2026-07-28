@@ -8,6 +8,14 @@
     {
       "path": "/api/cron/recompute-and-alert",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/catalog/sync",
+      "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-worker",
+      "schedule": "1-59/2 * * * *"
     }
   ]
 }

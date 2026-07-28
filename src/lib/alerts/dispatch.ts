@@ -72,7 +72,16 @@ export async function runDispatch(opts: RunDispatchOptions): Promise<DispatchRep
       continue;
     }
 
-    const { subject, html } = renderAlertEmail(row, alertReasons(row), config);
+    const rendered = renderAlertEmail(row, alertReasons(row), config);
+    // Provisional lead time: the tier is computed from a category-DEFAULT lead time the
+    // operator hasn't confirmed. Still ALERT (14-week lead times — silence is worse), but
+    // mark it in the subject, body, and alert_log so nobody places a PO off an unconfirmed
+    // estimate. Cleared once an admin confirms the lead time (Task 8).
+    const provisional = row.leadTimeProvisional === true;
+    const subject = provisional ? `${rendered.subject} (provisional lead time)` : rendered.subject;
+    const html = provisional
+      ? `<p style="margin:0 0 12px;padding:8px 12px;background:#fef3c7;color:#92400e;border-radius:6px">⚠ Provisional lead time — confirm before ordering.</p>${rendered.html}`
+      : rendered.html;
 
     if (dryRun) {
       results.push({ ...base, action: "would-send", reason: decision.reason, subject, recipients: to });
@@ -108,6 +117,7 @@ export async function runDispatch(opts: RunDispatchOptions): Promise<DispatchRep
         alert_level: level,
         message: subject,
         channels_sent: ["email"],
+        lead_time_provisional: provisional,
         fired_at: now.toISOString(),
       });
       if (ins.error) throw new Error(ins.error.message);

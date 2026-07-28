@@ -8,6 +8,9 @@
 /out/
 /build
 /dist
+
+# Supabase CLI local temp (created by supabase CLI probes; not part of the repo)
+/supabase/.temp/
 next-env.d.ts
 *.tsbuildinfo
 

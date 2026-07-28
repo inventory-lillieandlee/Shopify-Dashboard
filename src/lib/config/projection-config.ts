@@ -69,6 +69,10 @@ export function buildProjectionSettings(
 export async function loadProjectionSettings(client: SupabaseClient): Promise<ProjectionSettings> {
   const [app, cats] = await Promise.all([
     client.from("app_config").select("growth_pct, spike_threshold_pct").limit(1).maybeSingle(),
+    // TIER days only. Deliberately NOT selecting category_thresholds.lead_time_days /
+    // safety_stock_days: those are ADD-TIME DEFAULTS for new products (product picker)
+    // and must never feed the engine — per-SKU products.lead_time_days/safety_stock_days
+    // are the authoritative values the engine reads (see readRecomputeInputs).
     client
       .from("category_thresholds")
       .select("category, yellow_days, red_days, critical_days, yellow_enabled, red_enabled, critical_enabled"),

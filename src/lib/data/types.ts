@@ -33,4 +33,7 @@ export interface InventoryRow {
   reorderDate: string | null; // YYYY-MM-DD
   spikePct: number | null;
   alertLevel: AlertLevel | null;
+  // product-picker lifecycle (Phase H). Existing SKUs are always ready/false.
+  historyStatus: "pending" | "building" | "ready" | "failed";
+  leadTimeProvisional: boolean; // lead time came from a category default, not yet confirmed
 }

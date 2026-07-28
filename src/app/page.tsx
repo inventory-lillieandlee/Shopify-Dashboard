@@ -1,5 +1,6 @@
 import { getInventoryRows } from "@/lib/data/inventory";
 import { getMonthlySales, getCurrentMonthSalesUpdatedAt } from "@/lib/data/monthly-sales";
+import { getAvailableCatalog, getAddingProducts } from "@/lib/data/catalog";
 import { historyStartMonth } from "@/lib/sales";
 import {
   deriveSummary,
@@ -16,6 +17,8 @@ import { SummaryCards } from "@/components/summary-cards";
 import { TableControls } from "@/components/table-controls";
 import { InventoryTable } from "@/components/inventory-table";
 import { ReorderQueue } from "@/components/reorder-queue";
+import { ProductPicker } from "@/components/product-picker";
+import { AddingStrip } from "@/components/adding-strip";
 
 // Live data from Supabase — always render fresh (no static caching).
 export const dynamic = "force-dynamic";
@@ -53,10 +56,12 @@ export default async function Page({
   const now = new Date();
   const currentMonth = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   // Parallel reads through the seam — no client-side waterfall for the popup chart.
-  const [all, sales, salesUpdatedAt] = await Promise.all([
+  const [all, sales, salesUpdatedAt, catalog, adding] = await Promise.all([
     getInventoryRows(),
     getMonthlySales(),
     getCurrentMonthSalesUpdatedAt(currentMonth),
+    getAvailableCatalog(),
+    getAddingProducts(),
   ]);
   const historyStart = historyStartMonth(sales); // earliest tracked month, derived from data
   const summary = deriveSummary(all);
@@ -85,13 +90,17 @@ export default async function Page({
                 {category || alert ? " (filtered)" : ""}
               </p>
             </div>
-            <TableControls
-              category={category}
-              alert={alert}
-              sort={sort}
-              dir={dir}
-            />
+            <div className="flex flex-wrap items-center gap-2">
+              <TableControls
+                category={category}
+                alert={alert}
+                sort={sort}
+                dir={dir}
+              />
+              <ProductPicker catalog={catalog} />
+            </div>
           </div>
+          <AddingStrip rows={adding} />
           <div
             className={cn(
               surfacePanel,

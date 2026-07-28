@@ -85,6 +85,10 @@ export async function readRecomputeInputs(
       .from("products")
       .select("id, name, category, lead_time_days, safety_stock_days")
       .eq("active", true)
+      // Only project products whose history backfill is done. A newly added product is
+      // active=false until backfill finishes anyway, but this guards the seam explicitly
+      // so a building product can never reach the engine. Existing SKUs are all 'ready'.
+      .eq("history_status", "ready")
       .order("name"),
     client
       .from("inventory_snapshots")

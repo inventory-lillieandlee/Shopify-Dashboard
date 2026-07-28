@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { X, TriangleAlert } from "lucide-react";
+import { X, TriangleAlert, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AlertBadge } from "@/components/alert-badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AlertReasonList } from "@/components/alert-reason";
 import { SalesChart } from "@/components/ui/sales-chart";
 import { lastNMonths, trimLeadingZeroMonths, shortMonth, longMonthYear, isSalesStale, type MonthlySale } from "@/lib/sales";
@@ -63,6 +65,36 @@ export function SalesPopup({
   // inventory refreshes on its own cron and would mask a stalled sales sync.)
   const salesStale = isSalesStale(salesUpdatedAt, Date.now());
 
+  // Remove (active=false via the admin-gated route). No login → 401; surfaced plainly.
+  const router = useRouter();
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const [removeErr, setRemoveErr] = useState<string | null>(null);
+  async function removeProduct() {
+    setRemoving(true);
+    setRemoveErr(null);
+    try {
+      const res = await fetch("/api/products/remove", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: row.productId }),
+      });
+      if (!res.ok) {
+        setRemoveErr(res.status === 401 ? "Sign in as an admin to remove products." : `Failed (${res.status})`);
+        setConfirmRemove(false);
+        return;
+      }
+      setConfirmRemove(false);
+      onClose();
+      router.refresh();
+    } catch (e) {
+      setRemoveErr(String(e));
+      setConfirmRemove(false);
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   return (
     <div
       role="dialog"
@@ -86,6 +118,14 @@ export function SalesPopup({
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <AlertBadge level={row.alertLevel} />
               <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[row.category]}</span>
+              {row.leadTimeProvisional && (
+                <span
+                  title="Lead time is a category default, not yet confirmed. Confirm it in Settings."
+                  className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"
+                >
+                  provisional lead time
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -119,23 +159,28 @@ export function SalesPopup({
             </div>
           </div>
 
-          {sales.length === 0 ? (
+          {/* Key the empty state on the TRIMMED, windowed series (bars) — a product whose
+              months are all zero trims to an empty series, which must render an explicit
+              "no sales yet" state, not a chart with no bars. */}
+          {bars.length === 0 ? (
             <div className="rounded-xl border border-border bg-muted/40 p-6 text-center text-sm text-muted-foreground">
-              No sales history recorded yet.
+              No sales history yet.
             </div>
           ) : (
             <SalesChart data={bars} />
           )}
 
-          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-            {historyStart && (
-              <>
-                Sales history starts{" "}
-                <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong>.{" "}
-              </>
-            )}
-            The current month is partial (<em>MTD</em>).
-          </p>
+          {bars.length > 0 && (
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              {historyStart && (
+                <>
+                  Sales history starts{" "}
+                  <strong className="font-medium text-foreground">{longMonthYear(historyStart)}</strong>.{" "}
+                </>
+              )}
+              The current month is partial (<em>MTD</em>).
+            </p>
+          )}
 
           {salesStale && (
             <p
@@ -174,16 +219,35 @@ export function SalesPopup({
             </div>
           )}
 
-          <div className="mt-4">
+          <div className="mt-4 flex items-center justify-between gap-3">
             <Link
               href={`/sku/${row.shopifyProductId}`}
               className="text-sm font-medium text-brand underline-offset-2 hover:underline"
             >
               View full details →
             </Link>
+            <button
+              type="button"
+              onClick={() => setConfirmRemove(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+            >
+              <Trash2 className="size-3.5" /> Remove
+            </button>
           </div>
+          {removeErr && <p className="mt-2 text-xs text-red-700 dark:text-red-400">{removeErr}</p>}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmRemove}
+        title="Remove product?"
+        message={`Remove "${row.name}" from the dashboard? It stops appearing and stops alerting (set inactive — sales history is retained, not deleted).`}
+        confirmLabel="Remove"
+        destructive
+        busy={removing}
+        onConfirm={removeProduct}
+        onCancel={() => setConfirmRemove(false)}
+      />
     </div>
   );
 }

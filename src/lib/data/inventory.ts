@@ -10,6 +10,8 @@ interface ProductRow {
   category: string;
   lead_time_days: number;
   safety_stock_days: number;
+  history_status: string;
+  lead_time_provisional: boolean;
 }
 interface SnapshotRow {
   product_id: string;
@@ -69,7 +71,7 @@ export async function getInventoryRowsWith(supabase: SupabaseClient): Promise<In
   const [products, snapshots, projections] = await Promise.all([
     supabase
       .from("products")
-      .select("id, shopify_product_id, name, category, lead_time_days, safety_stock_days")
+      .select("id, shopify_product_id, name, category, lead_time_days, safety_stock_days, history_status, lead_time_provisional")
       .eq("active", true)
       .order("name"),
     supabase
@@ -116,6 +118,8 @@ export async function getInventoryRowsWith(supabase: SupabaseClient): Promise<In
       reorderDate: pr?.reorder_date ?? null,
       spikePct: toNum(pr?.spike_pct),
       alertLevel: (pr?.alert_level as AlertLevel | undefined) ?? null,
+      historyStatus: (p.history_status as InventoryRow["historyStatus"]) ?? "ready",
+      leadTimeProvisional: Boolean(p.lead_time_provisional),
     };
   });
 }

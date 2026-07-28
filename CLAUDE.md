@@ -142,6 +142,7 @@ Do **not** build ReCharge, projections, spike detection, or alerts in Phase 1.
 - **Timezone**: do all date math (reorder dates, cron times, digest) in the business timezone — set `APP_TIMEZONE`, don't rely on UTC defaults.
 - **Phase 1 caveat**: `tpl_units = 0` until 3PL data exists, so DSR will under-report if most stock sits at the 3PL. Keep external alerts gated/off until 3PL counts are flowing — otherwise they'll over-fire.
 - **Secrets**: env only, never commit. Protect cron + webhook routes with a shared `CRON_SECRET` / verified signature.
+- **Migration-ledger drift (boundary)**: parts of the prod schema were applied via Supabase `execute_sql` (MCP) outside the `apply_migration` ledger (e.g. `authenticated_read_additive`, some Phase F/H columns), so `supabase/migrations` does NOT fully reproduce prod — a `supabase db reset` from files will diverge. Reconcile against prod before any local reset.
 
 ## Environment variables (`.env.example`)
 
