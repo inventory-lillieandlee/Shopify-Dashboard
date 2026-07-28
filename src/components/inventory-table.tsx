@@ -138,6 +138,7 @@ export function InventoryTable({
   currentMonth,
   historyStart,
   salesUpdatedAt,
+  isAdmin = false,
 }: {
   rows: InventoryRow[];
   sort: SortKey;
@@ -146,6 +147,7 @@ export function InventoryTable({
   currentMonth: string;
   historyStart: string | null;
   salesUpdatedAt: string | null;
+  isAdmin?: boolean;
 }) {
   const [selected, setSelected] = useState<InventoryRow | null>(null);
 
@@ -222,6 +224,7 @@ export function InventoryTable({
           currentMonth={currentMonth}
           historyStart={historyStart}
           salesUpdatedAt={salesUpdatedAt}
+          isAdmin={isAdmin}
           onClose={() => setSelected(null)}
         />
       )}
