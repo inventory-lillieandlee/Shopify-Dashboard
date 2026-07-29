@@ -10,7 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AlertReasonList } from "@/components/alert-reason";
 import { SalesChart } from "@/components/ui/sales-chart";
 import { lastNMonths, trimLeadingZeroMonths, shortMonth, longMonthYear, isSalesStale, type MonthlySale } from "@/lib/sales";
-import { CATEGORY_LABELS, alertReasons, daysUntil } from "@/lib/dashboard";
+import { categoryLabel, alertReasons, daysUntil } from "@/lib/dashboard";
 import { formatDate, formatNumber, formatRelative, reorderLabel } from "@/lib/format";
 import type { InventoryRow } from "@/lib/data/types";
 
@@ -117,7 +117,7 @@ export function SalesPopup({
             </h2>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <AlertBadge level={row.alertLevel} />
-              <span className="text-xs text-muted-foreground">{CATEGORY_LABELS[row.category]}</span>
+              <span className="text-xs text-muted-foreground">{categoryLabel(row.category)}</span>
               {row.leadTimeProvisional && (
                 <span
                   title="Lead time is a category default, not yet confirmed. Confirm it in Settings."

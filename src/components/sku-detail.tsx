@@ -4,7 +4,7 @@ import { AlertReasonList } from "@/components/alert-reason";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
 import type { InventoryRow } from "@/lib/data/types";
-import { CATEGORY_LABELS, alertReasons, daysUntil } from "@/lib/dashboard";
+import { categoryLabel, alertReasons, daysUntil } from "@/lib/dashboard";
 import { deriveThresholds } from "@/lib/projections/engine";
 import { formatDate, formatNumber, formatRelative, reorderLabel } from "@/lib/format";
 
@@ -45,7 +45,7 @@ export function SkuDetail({ row }: { row: InventoryRow }) {
           <h1 className="font-display text-2xl font-semibold text-brand">{row.name}</h1>
           <AlertBadge level={row.alertLevel} />
         </div>
-        <div className="text-sm text-muted-foreground">{CATEGORY_LABELS[row.category]}</div>
+        <div className="text-sm text-muted-foreground">{categoryLabel(row.category)}</div>
         <AlertReasonList reasons={reasons} />
       </header>
 

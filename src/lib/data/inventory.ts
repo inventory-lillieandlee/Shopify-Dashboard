@@ -7,7 +7,7 @@ interface ProductRow {
   id: string;
   shopify_product_id: number;
   name: string;
-  category: string;
+  category: string | null;
   lead_time_days: number;
   safety_stock_days: number;
   history_status: string;
@@ -107,7 +107,7 @@ export async function getInventoryRowsWith(supabase: SupabaseClient): Promise<In
       productId: p.id,
       shopifyProductId: String(p.shopify_product_id),
       name: p.name,
-      category: p.category as Category,
+      category: (p.category as Category | null) ?? null,
       leadTimeDays: p.lead_time_days,
       safetyStockDays: p.safety_stock_days,
       currentUnits: clampNonNeg(toNum(s?.shopify_units)),

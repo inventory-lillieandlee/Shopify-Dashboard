@@ -4,7 +4,7 @@ import { AlertReasonText } from "@/components/alert-reason";
 import { cn } from "@/lib/utils";
 import { surfacePanel } from "@/lib/surface";
 import type { InventoryRow } from "@/lib/data/types";
-import { CATEGORY_LABELS, daysUntil, primaryAlertReason } from "@/lib/dashboard";
+import { categoryLabel, daysUntil, primaryAlertReason } from "@/lib/dashboard";
 import { formatNumber } from "@/lib/format";
 
 export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
@@ -49,7 +49,7 @@ export function ReorderQueue({ rows }: { rows: InventoryRow[] }) {
                       {r.name}
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      {CATEGORY_LABELS[r.category]}
+                      {categoryLabel(r.category)}
                       <AlertReasonText reason={reason} />
                     </div>
                   </div>

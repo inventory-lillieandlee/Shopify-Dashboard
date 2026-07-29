@@ -21,7 +21,7 @@ export interface InventoryRow {
   productId: string;
   shopifyProductId: string;
   name: string;
-  category: Category;
+  category: Category | null; // null = uncategorized (e.g. merchandise) — tracked for stock, not projected
   leadTimeDays: number;
   safetyStockDays: number;
   // from inventory_snapshots (latest)

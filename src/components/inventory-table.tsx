@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import type { InventoryRow } from "@/lib/data/types";
 import type { MonthlySale } from "@/lib/sales";
 import {
-  CATEGORY_LABELS,
+  categoryLabel,
   daysUntil,
   primaryAlertReason,
   SPIKE_ALERT_THRESHOLD,
@@ -100,7 +100,7 @@ function MobileCards({ rows, onOpen }: { rows: InventoryRow[]; onOpen: (r: Inven
           )}
         >
           <div className="font-medium text-brand">{r.name}</div>
-          <div className="text-xs text-muted-foreground">{CATEGORY_LABELS[r.category]}</div>
+          <div className="text-xs text-muted-foreground">{categoryLabel(r.category)}</div>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1">
             <AlertBadge level={r.alertLevel} />
             <AlertReasonText reason={primaryAlertReason(r)} />
@@ -190,7 +190,7 @@ export function InventoryTable({
                   className={cn("cursor-pointer", r.alertLevel === "critical" && "bg-red-50/60")}
                 >
                   <TableCell className="font-medium text-brand">{r.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{CATEGORY_LABELS[r.category]}</TableCell>
+                  <TableCell className="text-muted-foreground">{categoryLabel(r.category)}</TableCell>
                   <TableCell className="text-right tabular-nums">{formatNumber(r.currentUnits)}</TableCell>
                   <TableCell className="text-right tabular-nums">
                     {r.daysOfStockRemaining === null ? "—" : `${formatNumber(r.daysOfStockRemaining)}d`}

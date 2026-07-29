@@ -40,3 +40,6 @@ Thumbs.db
 
 # packed skill archives — the unpacked .claude/skills/<name>/ dir is the canonical form
 *.skill
+
+# One-off admin provisioning script — local only, never committed
+/scripts/provision-admin.ts

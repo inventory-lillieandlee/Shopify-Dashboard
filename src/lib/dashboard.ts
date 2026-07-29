@@ -12,6 +12,11 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   human_supplement: "Human Supplement",
 };
 
+/** Display label for a product's category; blank when uncategorized (e.g. merchandise). */
+export function categoryLabel(category: Category | null): string {
+  return category ? CATEGORY_LABELS[category] : "";
+}
+
 export const ALERT_LABELS: Record<AlertLevel, string> = {
   ok: "OK",
   yellow: "Yellow",

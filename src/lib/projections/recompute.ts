@@ -89,6 +89,10 @@ export async function readRecomputeInputs(
       // active=false until backfill finishes anyway, but this guards the seam explicitly
       // so a building product can never reach the engine. Existing SKUs are all 'ready'.
       .eq("history_status", "ready")
+      // Uncategorized products (e.g. merchandise) are inventory-only: no category → no lead
+      // time → no honest reorder/tier projection. Skip them here so they never get a computed
+      // tier; they still appear on the dashboard (getInventoryRows) with their stock.
+      .not("category", "is", null)
       .order("name"),
     client
       .from("inventory_snapshots")

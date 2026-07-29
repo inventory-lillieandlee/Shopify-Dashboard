@@ -58,7 +58,7 @@ export async function runDispatch(opts: RunDispatchOptions): Promise<DispatchRep
     const base = { productId: row.productId, sku: row.name, level };
 
     // Per-(category, tier) mute: dashboard still shows the tier, but no email fires.
-    const tierEnabled = alertEnabledByCategory.get(row.category)?.[level as keyof TierEnabled] ?? true;
+    const tierEnabled = alertEnabledByCategory.get(row.category ?? "")?.[level as keyof TierEnabled] ?? true;
     if (!tierEnabled) {
       results.push({ ...base, action: "skipped", reason: "muted" });
       continue;
